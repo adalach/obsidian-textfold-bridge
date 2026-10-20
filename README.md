@@ -49,15 +49,15 @@ Drag something from TextFold's reader (a paragraph by its handle, a heading, a s
   ```
 
   The callout's last line ends with a `↗` link back, which the plugin draws as TextFold's icon. A note shows its passage and then your comment; a conversation its passage, your question in bold and the answer. When the text is the model's words (a Key, Takeaway or Topic level, a summary, an answer), the callout says `[!textfold|written]` and shows "written by the model" after its title. The callout carries TextFold's icon and takes the colour of your theme's "example" callout.
-- **Quote with the link**: the text as a quote, its last line ending in the `↗` link back (and "written by the model" for the model's words).
-- **Link only**: `[Title › Section](link)` among the words where it was dropped.
-- **Text with a TextFold icon**: just the text, followed by a small TextFold icon that links back:
+- **Quote**: the text as a quote, its last line ending in the `↗` link back (and "written by the model" for the model's words).
+- **Text**: just the text, followed by the TextFold icon that links back:
 
   ```markdown
   Primitives are fitted greedily. [↗](textfold://open?paper=2602.07369&u=S3.p2&level=key)
   ```
 
   A paragraph, summary, selection or chip goes in as it read; a note as its passage, then your comment; a conversation as its answer in one sentence. Dropped among words it goes in among them, else on a line of its own. The plugin draws every `textfold://` link labelled exactly `↗` as TextFold's icon, in Reading view and in Live Preview (put the cursor in it to edit the Markdown); a click opens TextFold there and a hover previews it. Without the plugin, on another device or in another app, it reads as the text and a ↗ link.
+- **Full link**: a titled link, `[Title › Section](link)`, among the words where it was dropped.
 
 A dragged or pasted bare `textfold://` link is filled in the same way from TextFold (title, section, the paragraph or summary at the link's level). Every other drop and paste is left to Obsidian. Rows of the TextFold notes sidebar can be dragged into a note the same way.
 

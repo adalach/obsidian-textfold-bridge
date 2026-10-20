@@ -115,8 +115,9 @@ export class BridgeSettingTab extends PluginSettingTab {
 				items: [
 					{
 						name: "Dropped TextFold items as",
-						desc: "What a paragraph, note or selection dragged or pasted from TextFold (or from the sidebar) becomes in a note: a callout with its text and link, a quote with the link, the link alone, or its text followed by a small TextFold icon that links back.",
-						control: { type: "dropdown", key: "dropAs", defaultValue: DEFAULT_SETTINGS.dropAs, options: { callout: "Callout", quote: "Quote with the link", link: "Link only", icon: "Text with a TextFold icon" } },
+						desc: "Callout, Quote and Text end with the TextFold icon linking back; Full link inserts a titled link.",
+						// (the stored values stay as they were: "icon" is Text, "link" is Full link)
+						control: { type: "dropdown", key: "dropAs", defaultValue: DEFAULT_SETTINGS.dropAs, options: { callout: "Callout", quote: "Quote", icon: "Text", link: "Full link" } },
 					},
 				],
 			},

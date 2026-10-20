@@ -2,9 +2,9 @@
 // note's `textfold:` property, and folded in a language. The plugin keeps, per document, a hash of what it sent, so it
 // can tell when the note has changed since; a refold puts the new text in place of the old under the same id (TextFold
 // finds its notes again in it) and folds it again. Progress comes from GET /api/jobs while a fold runs.
-import { App, Modal, Notice, Setting, TFile } from "obsidian";
+import { App, Modal, Notice, Setting, TFile, arrayBufferToBase64, normalizePath } from "obsidian";
 import { Job, TextFoldClient, TextFoldError } from "./client";
-import { flattenNote, textHash } from "./flatten";
+import { ImageRef, PictureReport, describePictures, flattenNote, imageRefs, passesThrough, textHash } from "./flatten";
 import { isPaperId, withId, withoutId } from "./links";
 
 export interface FoldRecord {
@@ -23,12 +23,16 @@ export type FoldState =
 	| { kind: "folded" };
 
 const POLL_MS = 1500;
+const MAX_IMAGE = 15_000_000; // TextFold's own limit for one picture (local.py MAX_IMG)
+const MIME: Record<string, string> = { png: "png", jpg: "jpeg", jpeg: "jpeg", gif: "gif", webp: "webp" }; // what TextFold takes
+
 
 export class Folds {
 	private jobs = new Map<string, Job>(); // paper -> its fold's last known job
 	private polling = false;
 	private timer = 0;
 	private listeners = new Set<() => void>();
+	private dataUris = new Map<string, { mtime: number; size: number; uri: string }>(); // a vault picture, read once per version
 
 	constructor(
 		private app: App,
@@ -67,7 +71,7 @@ export class Folds {
 	/** Fold the note, or fold it again when it has changed since. */
 	async fold(file: TFile): Promise<void> {
 		const rec = this.recordFor(file);
-		const { text, hash } = await this.prepare(file);
+		const { text, hash, pictures } = await this.prepare(file);
 		if (!text.trim()) {
 			new Notice("This note has no text to fold.");
 			return;
@@ -114,7 +118,7 @@ export class Folds {
 			this.jobs.set(paper, job);
 			this.emit();
 			this.poll();
-			new Notice(force ? "Folding the note again in TextFold…" : "Folding the note in TextFold…");
+			new Notice(`${force ? "Folding the note again in TextFold…" : "Folding the note in TextFold…"}${describePictures(pictures)}`, pictures.left.length ? 10_000 : 5000);
 		} catch (e) {
 			new Notice(foldError(e), 10_000);
 		}
@@ -134,11 +138,66 @@ export class Folds {
 	}
 
 	/** The note's text as it would be sent, and its hash. */
-	private async prepare(file: TFile): Promise<{ text: string; hash: string }> {
+	/** The note's text as it would be sent, its hash (which changes when an embedded picture's file does), and what
+	 *  became of its pictures. */
+	async prepare(file: TFile): Promise<{ text: string; hash: string; pictures: PictureReport }> {
 		const raw = await this.app.vault.cachedRead(file);
 		const title: unknown = this.app.metadataCache.getFileCache(file)?.frontmatter?.title;
-		const text = flattenNote(raw, title);
-		return { text, hash: await textHash(text) };
+		const { map, report } = await this.pictures(file, raw);
+		const text = flattenNote(raw, title, map);
+		return { text, hash: await textHash(text), pictures: report };
+	}
+
+	/** The vault pictures the note embeds, as data-URI images TextFold stores with the document: PNG, JPEG, GIF and
+	 *  WebP up to 15 MB. Web pictures go as they are; SVG, larger files and embeds that lead nowhere are left out. */
+	private async pictures(file: TFile, raw: string): Promise<{ map: Map<string, string>; report: PictureReport }> {
+		const map = new Map<string, string>();
+		const report: PictureReport = { sent: 0, left: [] };
+		for (const ref of imageRefs(raw)) {
+			if (passesThrough(ref)) {
+				report.sent++;
+				continue;
+			}
+			const dest = this.pictureFile(ref, file);
+			const name = dest?.name ?? ref.target;
+			const ext = dest?.extension.toLowerCase() ?? "";
+			if (!dest) {
+				if (ref.kind === "markdown" || /\.(png|jpe?g|gif|webp|svg|bmp|tiff?|avif)$/i.test(ref.target)) report.left.push({ name, why: "not found in the vault" });
+				continue; // (an embed of a note or a PDF is no picture: dropped, as always)
+			}
+			if (ext === "svg") {
+				report.left.push({ name, why: "SVG" });
+				continue;
+			}
+			if (!MIME[ext]) {
+				if (ref.kind === "markdown") report.left.push({ name, why: `not a picture TextFold takes (.${ext})` });
+				continue;
+			}
+			if (dest.stat.size > MAX_IMAGE) {
+				report.left.push({ name, why: "over 15 MB" });
+				continue;
+			}
+			let hit = this.dataUris.get(dest.path);
+			if (!hit || hit.mtime !== dest.stat.mtime || hit.size !== dest.stat.size) {
+				hit = { mtime: dest.stat.mtime, size: dest.stat.size, uri: `data:image/${MIME[ext]};base64,${arrayBufferToBase64(await this.app.vault.readBinary(dest))}` };
+				this.dataUris.set(dest.path, hit);
+			}
+			const alt = (ref.alt || dest.basename).replace(/[[\]\n]/g, " ").trim();
+			map.set(ref.raw, `![${alt}](${hit.uri})`);
+			report.sent++;
+		}
+		return { map, report };
+	}
+
+	/** The vault file a picture points at, as Obsidian resolves it: a link path from the note, else a path relative to
+	 *  the note's folder. */
+	private pictureFile(ref: ImageRef, note: TFile): TFile | null {
+		const found = this.app.metadataCache.getFirstLinkpathDest(ref.target, note.path);
+		if (found) return found;
+		if (ref.kind !== "markdown") return null;
+		const folder = note.parent?.path ?? "";
+		const rel = this.app.vault.getAbstractFileByPath(normalizePath(folder && folder !== "/" ? `${folder}/${ref.target}` : ref.target));
+		return rel instanceof TFile ? rel : null;
 	}
 
 	private async forget(file: TFile, paper: string): Promise<void> {

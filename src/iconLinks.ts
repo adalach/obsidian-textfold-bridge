@@ -1,10 +1,15 @@
 // A textfold:// link whose label is exactly ↗ (`<text> [↗](textfold://…)`, as "Text with a TextFold icon" drops write
-// it) is drawn as TextFold's icon, inline at the text's height: in Reading view by a post-processor, in Live Preview by
-// a CodeMirror decoration that shows the Markdown again while the cursor is in the link. The icon is an
-// <a href="textfold://…">, so the plugin's click handler opens it (with the missing-paper check) and its hover handler
-// previews it. Without the plugin the Markdown still reads as text with a ↗ link.
+// it) is drawn as TextFold's icon, inline at the text's height. In Reading view a post-processor turns the rendered <a>
+// into the icon; the plugin's click handler opens it (with the missing-paper check) and its hover handler previews it.
+// In Live Preview it adds one mark decoration, on the ↗, and nothing else: Obsidian renders the link as it always does
+// (its label shown, the address hidden, its own click handling, which the plugin's window.open wrapper takes for
+// textfold:), styles.css draws the marked ↗ as the logo and hides the external-link arrow Obsidian puts after it. The
+// line's DOM stays Obsidian's. (Until 0.5.0 a replace widget at the highest precedence stood in for the whole link,
+// next to Obsidian's own widgets for it; a freshly dropped callout was seen drawn one letter per row after the first
+// click into it, which switches it to its source lines.) While the cursor is in the link, it shows as written.
+// Without the plugin the Markdown still reads as text with a ↗ link.
 import { Prec, RangeSetBuilder } from "@codemirror/state";
-import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
+import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate } from "@codemirror/view";
 import { Plugin, editorLivePreviewField, setIcon } from "obsidian";
 import { ICON_LABEL } from "./drag";
 import { ICON } from "./icon";
@@ -26,30 +31,12 @@ export function installIconLinks(plugin: Plugin): void {
 			if (a.textContent === ICON_LABEL && parseLink(a.getAttribute("href") ?? "")) asIcon(a);
 		});
 	});
-	// above Live Preview's own link rendering, which would otherwise draw the link over the icon
+	// at the highest precedence the mark is the innermost span, around the glyph alone, inside Obsidian's link spans
 	plugin.registerEditorExtension(Prec.highest(iconLinkPlugin));
 }
 
-class IconWidget extends WidgetType {
-	constructor(readonly href: string) {
-		super();
-	}
-
-	eq(other: IconWidget): boolean {
-		return other.href === this.href;
-	}
-
-	toDOM(): HTMLElement {
-		const a = createEl("a", { cls: "external-link", href: this.href });
-		asIcon(a);
-		return a;
-	}
-
-	// a click opens the link (the plugin's capture handler) instead of putting the cursor in it
-	ignoreEvent(): boolean {
-		return true;
-	}
-}
+// the ↗, drawn as the logo
+const iconMark = Decoration.mark({ class: "tfb-lp-icon", attributes: { "aria-label": "Open in TextFold" } });
 
 /** Where code is in these lines: fenced blocks, and inline code spans by their backticks. */
 function inCode(view: EditorView, from: number): (pos: number) => boolean {
@@ -82,7 +69,7 @@ function build(view: EditorView): DecorationSet {
 			const start = from + (m.index ?? 0);
 			const end = start + m[0].length;
 			if (ranges.some(r => r.from <= end && r.to >= start) || code(start) || !parseLink(m[1])) continue;
-			builder.add(start, end, Decoration.replace({ widget: new IconWidget(m[1]) }));
+			builder.add(start + 1, start + 1 + ICON_LABEL.length, iconMark); // the ↗ of [↗](…)
 		}
 	}
 	return builder.finish();

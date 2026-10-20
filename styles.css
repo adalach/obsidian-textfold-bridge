@@ -369,6 +369,39 @@
 	height: 0.95em;
 }
 
+/* Live Preview: the ↗ of such a link, a mark inside Obsidian's own link rendering, drawn as the logo (icon.ts's bars)
+   in the accent colour; the glyph itself is hidden, and so is the external-link arrow Obsidian draws for the address */
+.tfb-lp-icon {
+	display: inline-block;
+	width: 0.95em;
+	height: 0.95em;
+	margin: 0 1px;
+	overflow: hidden;
+	vertical-align: -0.1em;
+	background-color: var(--text-accent);
+	-webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='10' y='15' width='80' height='12' rx='6'/%3E%3Crect x='10' y='44' width='55' height='12' rx='6' fill-opacity='0.55'/%3E%3Crect x='10' y='73' width='25' height='12' rx='6'/%3E%3C/svg%3E") center / contain no-repeat;
+	mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='10' y='15' width='80' height='12' rx='6'/%3E%3Crect x='10' y='44' width='55' height='12' rx='6' fill-opacity='0.55'/%3E%3Crect x='10' y='73' width='25' height='12' rx='6'/%3E%3C/svg%3E") center / contain no-repeat;
+	cursor: pointer;
+}
+
+.tfb-lp-icon,
+.tfb-lp-icon * {
+	color: transparent;
+	text-decoration: none;
+}
+
+.tfb-lp-icon:hover,
+:hover > .tfb-lp-icon {
+	background-color: var(--text-accent-hover);
+}
+
+/* Obsidian's external-link arrow (the background of the span it puts in place of the address) after such a link: the
+   arrow that follows the icon's link with no other link in between */
+.cm-line > .cm-link:has(.tfb-lp-icon) ~ .cm-url.external-link:not(.cm-link:has(.tfb-lp-icon) ~ .cm-link:not(:has(.tfb-lp-icon)) ~ .cm-url) {
+	padding-inline-end: 0;
+	background-image: none;
+}
+
 /* ---------------------------------------------------------------- the fold view ("Fold this note")
    Gutter (section numbers, roles) | the text | TextFold's comments in the margin, as in TextFold's reader and the
    design mockup; every word a piece with an id that persists across levels, so a level change can slide it. */

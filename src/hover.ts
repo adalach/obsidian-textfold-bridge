@@ -49,8 +49,11 @@ export class LinkPreviews {
 	}
 
 	private onEditorHover(evt: MouseEvent, view: EditorView): boolean {
-		if (!this.enabled() || !Keymap.isModEvent(evt)) return false;
-		const target = (evt.target as Element | null)?.closest?.(".cm-link, .cm-url") as HTMLElement | null;
+		const el = evt.target as Element | null;
+		// TextFold's icon (iconLinks.ts) previews on a hover alone, as in Reading view; other links with Cmd/Ctrl held
+		const icon = el?.closest?.(".tfb-lp-icon") as HTMLElement | null;
+		if (!this.enabled() || (!icon && !Keymap.isModEvent(evt))) return false;
+		const target = icon ?? (el?.closest?.(".cm-link, .cm-url") as HTMLElement | null);
 		if (!target) return false;
 		let pos: number;
 		try {

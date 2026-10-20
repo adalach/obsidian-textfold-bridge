@@ -8,7 +8,7 @@
 
 ## Which TextFold
 
-Most of what the plugin does needs changes to TextFold that are not in a TextFold release yet. They are proposed to TextFold, one change each, and until they are merged you can try them all together from the branch [`textfold-bridge-all`](https://github.com/adalach/paperfold/tree/textfold-bridge-all) of a fork of TextFold:
+Most of what the plugin does needs changes to TextFold that are not in a TextFold release yet. They are proposed to TextFold in [chenxiachan/textfold#32](https://github.com/chenxiachan/textfold/issues/32), one change each, and until they are merged you can try them all together from the branch [`textfold-bridge-all`](https://github.com/adalach/paperfold/tree/textfold-bridge-all) of a fork of TextFold:
 
 ```bash
 git clone --branch textfold-bridge-all https://github.com/adalach/paperfold.git textfold-bridge

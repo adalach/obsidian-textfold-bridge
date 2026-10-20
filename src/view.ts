@@ -83,8 +83,11 @@ export class TextFoldNotesView extends ItemView {
 			setIcon(b, icon);
 			b.addEventListener("click", fn);
 		};
-		button("layers", "Fold this note in TextFold", () => {
-			if (this.file) void this.plugin.folds.fold(this.file);
+		button("fold-vertical", "Fold this note", () => {
+			if (this.file) void this.plugin.openFold(this.file);
+		});
+		button("upload", "Export this note to TextFold", () => {
+			if (this.file) void this.plugin.folds.fold(this.file, { exported: true });
 		});
 		button("download", "Import the notes of these documents into the vault", () => void this.importAll());
 		button("refresh-cw", "Refresh", () => void this.refresh(true));
@@ -136,7 +139,7 @@ export class TextFoldNotesView extends ItemView {
 		if (!ids.length) {
 			this.items = [];
 			this.fold = null;
-			this.showStatus("This note links to no TextFold document.", "Add textfold: <document id> to its properties, insert a link with \"Insert link to a TextFold paper\", drop something from TextFold, or fold the note with the layers button.");
+			this.showStatus("This note links to no TextFold document.", "Add textfold: <document id> to its properties, insert a link with \"Insert link to a TextFold paper\", drop something from TextFold, or fold or export the note with the buttons here.");
 			this.listEl.empty();
 			return;
 		}
@@ -365,9 +368,13 @@ export class TextFoldNotesView extends ItemView {
 		const text = row.createDiv("tfb-text");
 		const st = fold.state;
 		const refold = () => {
-			if (this.file) void this.plugin.folds.fold(this.file);
+			if (this.file) void this.plugin.folds.fold(this.file, { exported: true });
+		};
+		const foldHere = () => {
+			if (this.file) void this.plugin.openFold(this.file);
 		};
 		let action: [string, () => void] | null = null;
+		let second: [string, () => void] | null = null;
 		if (st.kind === "folding") {
 			setIcon(icon, "hourglass");
 			const j = st.job;
@@ -387,11 +394,13 @@ export class TextFoldNotesView extends ItemView {
 		} else {
 			setIcon(icon, "check");
 			text.setText(`Folded ${fold.rec.at.slice(0, 10)} · ${fold.rec.lang}`);
-			action = ["Open in TextFold", () => void this.plugin.opener.open({ paper: fold.rec.paper, lang: fold.rec.lang })];
+			action = ["Fold in Obsidian", foldHere];
+			second = ["Open in TextFold", () => void this.plugin.opener.open({ paper: fold.rec.paper, lang: fold.rec.lang })];
 		}
 		setTooltip(row, `${text.getText()}\n${fold.rec.paper}`, { placement: "left" });
-		if (action) {
-			const [label, fn] = action;
+		for (const a of [action, second]) {
+			if (!a) continue;
+			const [label, fn] = a;
 			const b = row.createEl("button", { cls: "tfb-button", text: label });
 			b.addEventListener("click", e => {
 				e.stopPropagation();

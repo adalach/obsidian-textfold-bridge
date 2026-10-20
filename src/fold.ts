@@ -1,5 +1,6 @@
-// "Fold this note": a note's text (Obsidian syntax flattened) sent to TextFold as a Markdown document, its id kept in the
-// note's `textfold:` property, and folded in a language. The plugin keeps, per document, a hash of what it sent, so it
+// A note's TextFold document: the note's text (Obsidian syntax flattened) sent to TextFold as a Markdown document, its
+// id kept in the note's `textfold:` property, and folded in a language. "Export this note to TextFold" and "Fold this
+// note" (the fold view) both go through here, so a note has one document, whichever was done first. The plugin keeps, per document, a hash of what it sent, so it
 // can tell when the note has changed since; a refold puts the new text in place of the old under the same id (TextFold
 // finds its notes again in it) and folds it again. Progress comes from GET /api/jobs while a fold runs.
 import { App, Modal, Notice, Setting, TFile, arrayBufferToBase64, normalizePath } from "obsidian";
@@ -15,6 +16,9 @@ export interface FoldRecord {
 	at: string; // ISO time of the last fold
 	job?: string; // the last fold's job
 }
+
+/** What a fold() came to: a job started, nothing to do (folded already), or nothing done (asked no, gone, failed). */
+export type FoldOutcome = "started" | "unchanged" | "cancelled" | "missing" | "failed" | "busy" | "empty";
 
 export type FoldState =
 	| { kind: "folding"; job: Job | null }
@@ -42,6 +46,11 @@ export class Folds {
 		private lang: () => string,
 	) {}
 
+	/** Called when a fold or translation ends well, with whether it was started by "Export this note" (to offer the
+	 *  next step: open it in TextFold, or fold it here). */
+	onFolded: ((rec: FoldRecord, exported: boolean) => void) | null = null;
+	private exported = new Set<string>(); // papers whose last job came from Export
+
 	onChange(fn: () => void): () => void {
 		this.listeners.add(fn);
 		return () => this.listeners.delete(fn);
@@ -68,27 +77,28 @@ export class Folds {
 		return { kind: "folded" };
 	}
 
-	/** Fold the note, or fold it again when it has changed since. */
-	async fold(file: TFile): Promise<void> {
+	/** Send the note to TextFold and fold it, or fold it again when it has changed since; `lang` another language than
+	 *  the setting's. `exported`: "Export this note" asked (it says so, and offers the next step when done). */
+	async fold(file: TFile, opts: { exported?: boolean; lang?: string; quiet?: boolean } = {}): Promise<FoldOutcome> {
 		const rec = this.recordFor(file);
 		const { text, hash, pictures } = await this.prepare(file);
 		if (!text.trim()) {
 			new Notice("This note has no text to fold.");
-			return;
+			return "empty";
 		}
-		const lang = this.lang();
+		const lang = opts.lang ?? this.lang();
 		const running = rec && this.jobs.get(rec.paper);
 		if (running && (running.status === "queued" || running.status === "running")) {
-			new Notice("TextFold is still folding this note.");
-			return;
+			if (!opts.quiet) new Notice("TextFold is still folding this note.");
+			return "busy";
 		}
 		try {
-			if (rec && rec.hash === hash && rec.lang === lang) {
+			if (rec && rec.hash === hash && (rec.lang === lang || opts.lang === undefined)) {
 				const doc = await this.client.doc(rec.paper, lang).catch(() => null);
-				if (!doc?.local) {
-					new Notice("This note has not changed since it was folded.");
-					return;
-				} // else stored without levels (no model then): fold it now
+				if (doc && !doc.local && doc.lang === lang) {
+					if (!opts.quiet) new Notice("This note has not changed since it was exported.");
+					return "unchanged";
+				} // else stored without levels (no model then), or not yet in this language: fold it now
 			}
 			let paper: string;
 			let force = false;
@@ -98,15 +108,15 @@ export class Folds {
 				} catch (e) {
 					if (e instanceof TextFoldError && e.kind === "missing") {
 						await this.forget(file, rec.paper);
-						new Notice(`TextFold no longer has this note's document (${rec.paper}). Run "Fold this note" again to fold it anew.`, 10_000);
-						return;
+						new Notice(`TextFold no longer has this note's document (${rec.paper}). Export or fold the note again to send it anew.`, 10_000);
+						return "missing";
 					}
 					throw e;
 				}
 				force = true;
 			} else if (rec) paper = rec.paper; // the same text: in another language, or still without levels
 			else {
-				if (!(await confirmFold(this.app, file, lang))) return;
+				if (!(await confirmFold(this.app, file, lang))) return "cancelled";
 				paper = (await this.client.importText(`${file.basename}.md`, text)).paper;
 				await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
 					fm.textfold = withId(fm.textfold, paper);
@@ -116,12 +126,23 @@ export class Folds {
 			this.records()[paper] = { paper, path: file.path, hash, lang, at: new Date().toISOString(), job: job.id };
 			await this.save();
 			this.jobs.set(paper, job);
+			if (opts.exported) this.exported.add(paper);
+			else this.exported.delete(paper);
 			this.emit();
 			this.poll();
-			new Notice(`${force ? "Folding the note again in TextFold…" : "Folding the note in TextFold…"}${describePictures(pictures)}`, pictures.left.length ? 10_000 : 5000);
+			const what = rec?.lang && rec.lang !== lang && !force ? `Translating the note in TextFold…` : force ? "Folding the note again in TextFold…" : opts.exported ? "Exporting the note to TextFold…" : "Folding the note in TextFold…";
+			new Notice(`${what}${describePictures(pictures)}`, pictures.left.length ? 10_000 : 5000);
+			return "started";
 		} catch (e) {
 			new Notice(foldError(e), 10_000);
+			return "failed";
 		}
+	}
+
+	/** The job under way for a document, if any. */
+	running(paper: string): Job | null {
+		const j = this.jobs.get(paper);
+		return j && (j.status === "queued" || j.status === "running") ? j : null;
 	}
 
 	/** Ask TextFold once about the last fold of these documents (the sidebar shows them). */
@@ -227,7 +248,10 @@ export class Folds {
 					if (now.status === "queued" || now.status === "running") active = true;
 					else {
 						this.client.forgetDoc(paper);
-						if (now.status === "done") new Notice("TextFold has folded the note.");
+						const rec = this.records()[paper];
+						if (now.status === "done" && rec && this.onFolded) this.onFolded(rec, this.exported.has(paper));
+						else if (now.status === "done") new Notice("TextFold has folded the note.");
+						this.exported.delete(paper);
 					}
 				}
 			} catch {

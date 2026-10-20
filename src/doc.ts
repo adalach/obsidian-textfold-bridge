@@ -6,7 +6,10 @@ import { Level } from "./links";
 export interface DocUnit {
 	id: string;
 	kind: string; // paragraph, list item, caption, abstract
+	role: string; // context, gap, claim, method, setup, result, analysis, limitation
 	full: string;
+	sentences: string[];
+	evidence: number[]; // the sentences the written levels rest on (Brief is exactly these)
 	brief: string[];
 	key: string;
 	takeaway: string;
@@ -32,6 +35,8 @@ export interface Doc {
 	source: { kind: string; url: string; label: string };
 	sections: DocSection[];
 	local: boolean; // no model has written its levels yet
+	model: string; // the model that wrote them
+	made: string; // when
 }
 
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
@@ -60,11 +65,14 @@ export function parseDoc(data: unknown): Doc | null {
 				topic: str(c.topic),
 				units: (Array.isArray(c.units) ? c.units : []).map((u): DocUnit => {
 					const x = obj(u);
-					return { id: str(x.id), kind: str(x.kind), full: str(x.full), brief: strs(x.brief), key: str(x.key), takeaway: str(x.takeaway), topic: str(x.topic) };
+					const evidence = Array.isArray(x.evidence) ? x.evidence.filter((n): n is number => typeof n === "number") : [];
+					return { id: str(x.id), kind: str(x.kind), role: str(x.role), full: str(x.full), sentences: strs(x.sentences), evidence, brief: strs(x.brief), key: str(x.key), takeaway: str(x.takeaway), topic: str(x.topic) };
 				}),
 			};
 		}),
 		local: obj(o.provenance).local === true,
+		model: str(obj(o.provenance).model),
+		made: str(obj(o.provenance).levels_made),
 	};
 }
 

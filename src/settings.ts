@@ -2,6 +2,9 @@
 // and where imported notes go.
 import { App, PluginSettingTab, Setting, SettingDefinitionItem, debounce } from "obsidian";
 import type { DropMode } from "./drag";
+import { FOLD_LEVELS, LEVEL_LABEL } from "./fold/align";
+import { languageOptions } from "./langs";
+import type { Level } from "./links";
 import type { ImportLocation } from "./notesMarkdown";
 import type TextFoldBridgePlugin from "./main";
 import { DEFAULT_URL, Resolved, loopbackUrl } from "./server";
@@ -13,7 +16,10 @@ export interface BridgeSettings {
 	openIn: "browser" | "app"; // browser: the reader page on the running server; app: textfold:// for TextFold to open
 	hoverPreviews: boolean;
 	dropAs: DropMode; // what a TextFold item dropped or pasted into a note becomes
-	foldLang: string; // the language "Fold this note" folds in
+	language: string; // "textfold" (TextFold's own) or a language code: what a note is folded and exported in
+	foldControl: "buttons" | "slider"; // the fold view's level control
+	foldComments: "margin" | "inline"; // TextFold's comments in the fold view: in the margin, or under their paragraph
+	foldStart: Level; // the level a fold view opens at
 	importLocation: ImportLocation; // where a new imported note goes
 	importFolder: string;
 	importNames: "title" | "citekey";
@@ -28,15 +34,16 @@ export const DEFAULT_SETTINGS: BridgeSettings = {
 	openIn: "browser",
 	hoverPreviews: true,
 	dropAs: "callout",
-	foldLang: "en",
+	language: "textfold",
+	foldControl: "buttons",
+	foldComments: "margin",
+	foldStart: "full",
 	importLocation: "folder",
 	importFolder: "TextFold",
 	importNames: "title",
 	sidebarTab: "note",
 	citationsGroup: "heading",
 };
-
-const LANG = /^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/;
 
 /** The connection in one plain sentence. */
 export function describeConnection(r: Resolved | null): string {
@@ -130,14 +137,23 @@ export class BridgeSettingTab extends PluginSettingTab {
 				items: [
 					{
 						name: "Language",
-						desc: "The language TextFold folds a note in, as a code such as en, de or zh. Folding uses the model set up in TextFold.",
-						control: {
-							type: "text",
-							key: "foldLang",
-							defaultValue: DEFAULT_SETTINGS.foldLang,
-							placeholder: "en",
-							validate: (v: string) => (LANG.test(v.trim()) ? undefined : "Use a language code such as en, de or zh-Hant."),
-						},
+						desc: "The language a note is folded and exported in. Another language is translated by the model set up in TextFold.",
+						control: { type: "dropdown", key: "language", defaultValue: DEFAULT_SETTINGS.language, options: languageOptions(this.plugin.langs) },
+					},
+					{
+						name: "Level control",
+						desc: "Buttons for the five levels, or a slider that moves the words as you drag it.",
+						control: { type: "dropdown", key: "foldControl", defaultValue: DEFAULT_SETTINGS.foldControl, options: { buttons: "Buttons", slider: "Slider" } },
+					},
+					{
+						name: "TextFold comments",
+						desc: "Your highlights, notes and questions from TextFold beside their paragraph, or under it. Highlights are marked in the text either way.",
+						control: { type: "dropdown", key: "foldComments", defaultValue: DEFAULT_SETTINGS.foldComments, options: { margin: "In the margin", inline: "Under the paragraph" } },
+					},
+					{
+						name: "Start level",
+						desc: "The level a folded note opens at.",
+						control: { type: "dropdown", key: "foldStart", defaultValue: DEFAULT_SETTINGS.foldStart, options: Object.fromEntries(FOLD_LEVELS.map(l => [l, LEVEL_LABEL[l]])) },
 					},
 				],
 			},
@@ -184,7 +200,10 @@ export class BridgeSettingTab extends PluginSettingTab {
 		else if (key === "openIn") s.openIn = value === "app" ? "app" : "browser";
 		else if (key === "hoverPreviews") s.hoverPreviews = value === true;
 		else if (key === "dropAs") s.dropAs = value === "quote" || value === "link" || value === "icon" ? value : "callout";
-		else if (key === "foldLang") s.foldLang = text || DEFAULT_SETTINGS.foldLang;
+		else if (key === "language") s.language = text || DEFAULT_SETTINGS.language;
+		else if (key === "foldControl") s.foldControl = value === "slider" ? "slider" : "buttons";
+		else if (key === "foldComments") s.foldComments = value === "inline" ? "inline" : "margin";
+		else if (key === "foldStart") s.foldStart = (FOLD_LEVELS as string[]).includes(text) ? (text as Level) : "full";
 		else if (key === "importLocation") s.importLocation = value === "current" || value === "root" ? value : "folder";
 		else if (key === "importFolder") s.importFolder = text || DEFAULT_SETTINGS.importFolder;
 		else if (key === "importNames") s.importNames = value === "citekey" ? "citekey" : "title";

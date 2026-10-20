@@ -3,6 +3,7 @@
 // folded: POST /api/import (a note's text, new or in place of its earlier text) and POST /api/generate.
 import { requestUrl } from "obsidian";
 import { Doc, parseDoc } from "./doc";
+import { Lang, parseLangs, readerLangOf } from "./langs";
 import { NotesFile, Paper, parseNotes, parsePapers } from "./notes";
 import { Resolved, dataFolders, expandHome, loopbackUrl, resolveServer } from "./server";
 
@@ -43,6 +44,8 @@ export class TextFoldClient {
 	private listeners = new Set<(state: Resolved | null) => void>();
 	private docs = new Map<string, Promise<Doc | null>>(); // per session: a document's text changes only when refolded
 	private paperList: { at: number; list: Promise<Paper[]> } | null = null;
+	/** The reader's language, when the running TextFold says it (in its settings, or in GET /api/models). */
+	readerLang: string | null = null;
 
 	constructor(private address: () => Address) {}
 
@@ -131,6 +134,22 @@ export class TextFoldClient {
 		for (const key of [...this.docs.keys()]) if (key.startsWith(`${id}\n`)) this.docs.delete(key);
 	}
 
+	/** The languages TextFold reads in (GET /api/langs), or null from a TextFold without that list. */
+	async langs(): Promise<Lang[] | null> {
+		return parseLangs(await this.getJson("/api/langs", true));
+	}
+
+	/** The reader's language, asked of TextFold's settings (GET /api/settings), else what /api/models said. */
+	async readerLanguage(): Promise<string | null> {
+		try {
+			const lang = readerLangOf(await this.getJson("/api/settings", true));
+			if (lang) this.readerLang = lang;
+		} catch {
+			// an older TextFold: what the alive check saw, if anything
+		}
+		return this.readerLang;
+	}
+
 	async jobs(): Promise<Job[]> {
 		const data = await this.getJson("/api/jobs");
 		return Array.isArray(data) ? data.filter((j): j is Job => !!j && typeof j === "object" && typeof (j as Job).id === "string") : [];
@@ -192,7 +211,15 @@ export class TextFoldClient {
 	private async probe(url: string): Promise<boolean> {
 		try {
 			const res = await this.request(`${url}/api/models`, "GET", undefined, PROBE_MS);
-			return res.status === 200 && /^\s*\{/.test(res.text);
+			const ok = res.status === 200 && /^\s*\{/.test(res.text);
+			if (ok) {
+				try {
+					this.readerLang = readerLangOf(JSON.parse(res.text)) ?? this.readerLang;
+				} catch {
+					// not JSON after all: no language to learn
+				}
+			}
+			return ok;
 		} catch {
 			return false;
 		}

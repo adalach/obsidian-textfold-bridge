@@ -368,3 +368,524 @@
 	width: 0.95em;
 	height: 0.95em;
 }
+
+/* ---------------------------------------------------------------- the fold view ("Fold this note")
+   Gutter (section numbers, roles) | the text | TextFold's comments in the margin, as in TextFold's reader and the
+   design mockup; every word a piece with an id that persists across levels, so a level change can slide it. */
+.tfb-fold-view {
+	--tfb-ai: var(--color-purple);
+	--tfb-ai-soft: color-mix(in srgb, var(--color-purple) 12%, transparent);
+	--tfb-accent-soft: color-mix(in srgb, var(--interactive-accent) 14%, transparent);
+	container-type: inline-size;
+	position: relative;
+	padding: 0;
+	overflow: auto;
+}
+
+.tfb-fold-bar {
+	position: sticky;
+	top: 0;
+	z-index: 3;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 4px 14px;
+	background-color: var(--background-primary);
+	border-bottom: 1px solid var(--background-modifier-border);
+	font-size: var(--font-ui-small);
+}
+
+.tfb-grow {
+	flex: 1;
+}
+
+.tfb-lang {
+	max-width: 11em;
+	font-size: var(--font-ui-smaller);
+}
+
+.tfb-lvl {
+	display: inline-flex;
+	align-items: stretch;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	overflow: hidden;
+}
+
+.tfb-lvl button {
+	display: inline-flex;
+	align-items: baseline;
+	gap: 4px;
+	height: auto;
+	padding: 2px 8px;
+	border: 0;
+	border-radius: 0;
+	box-shadow: none;
+	background: transparent;
+	color: var(--text-normal);
+	font-size: var(--font-ui-smaller);
+}
+
+.tfb-lvl button + button {
+	border-left: 1px solid var(--background-modifier-border);
+}
+
+.tfb-lvl button kbd {
+	font-size: 10px;
+	color: var(--text-faint);
+	background: none;
+	padding: 0;
+}
+
+.tfb-lvl button.is-written {
+	color: var(--tfb-ai);
+}
+
+.tfb-lvl button[aria-pressed="true"] {
+	background-color: var(--tfb-accent-soft);
+	color: var(--text-accent);
+	font-weight: var(--font-semibold);
+}
+
+.tfb-lvl-sep {
+	align-self: stretch;
+	border-left: 1px dashed var(--text-faint);
+}
+
+.tfb-slider {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.tfb-slider input {
+	width: 130px;
+}
+
+.tfb-slider-name {
+	min-width: 6.5em;
+	font-weight: var(--font-semibold);
+}
+
+.tfb-hint {
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+	white-space: nowrap;
+}
+
+.tfb-fold-line {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 3px 14px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+	border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.tfb-fold-line.is-empty {
+	display: none;
+}
+
+.tfb-fold-doc {
+	max-width: calc(44px + var(--file-line-width, 40rem) + 220px + 36px);
+	margin: 0 auto;
+	padding: 16px 18px 140px;
+	font-size: var(--font-text-size);
+	line-height: var(--line-height-normal);
+}
+
+.tfb-r {
+	display: grid;
+	grid-template-columns: 44px minmax(0, var(--file-line-width, 40rem)) 220px;
+	column-gap: 16px;
+}
+
+.tfb-inline .tfb-r {
+	grid-template-columns: 44px minmax(0, var(--file-line-width, 40rem));
+}
+
+.tfb-inline .tfb-mar {
+	grid-column: 2;
+}
+
+@container (max-width: 760px) {
+	.tfb-r,
+	.tfb-inline .tfb-r {
+		grid-template-columns: 30px minmax(0, 1fr);
+		column-gap: 10px;
+	}
+
+	.tfb-mar {
+		grid-column: 2;
+	}
+
+	.tfb-hint {
+		display: none;
+	}
+
+	.tfb-lvl-name {
+		display: none;
+	}
+}
+
+.tfb-gut {
+	padding-top: 0.3em;
+	text-align: right;
+	color: var(--text-faint);
+	font-size: 10.5px;
+	line-height: 1.3;
+	letter-spacing: 0.03em;
+}
+
+.tfb-gut .tfb-r-claim,
+.tfb-gut .tfb-r-result {
+	color: var(--text-muted);
+	font-weight: var(--font-semibold);
+}
+
+.tfb-gut .tfb-r-limitation,
+.tfb-gut .tfb-r-gap {
+	color: var(--text-warning);
+}
+
+.tfb-full-tag {
+	display: block;
+	color: var(--text-accent);
+	font-weight: var(--font-bold);
+}
+
+.tfb-mar {
+	min-width: 0;
+	font-size: var(--font-ui-small);
+	line-height: 1.45;
+}
+
+.tfb-head {
+	margin-bottom: 10px;
+}
+
+.tfb-title {
+	font-size: 1.6em;
+	font-weight: var(--font-bold);
+	line-height: 1.25;
+	color: var(--text-normal);
+}
+
+.tfb-prov {
+	margin-top: 4px;
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+}
+
+.tfb-prov em {
+	font-style: normal;
+	color: var(--tfb-ai);
+}
+
+.tfb-sh {
+	margin: 1.2em 0 0.35em;
+}
+
+.tfb-sh .tfb-txt {
+	font-weight: var(--font-semibold);
+	line-height: 1.3;
+	color: var(--text-normal);
+}
+
+.tfb-sh.tfb-d1 .tfb-txt {
+	font-size: 1.32em;
+}
+
+.tfb-sh.tfb-d2 .tfb-txt {
+	font-size: 1.14em;
+}
+
+.tfb-sh .tfb-gut {
+	padding-top: 0.35em;
+	font-size: 12px;
+	color: var(--text-muted);
+	font-variant-numeric: tabular-nums;
+}
+
+.tfb-stk .tfb-txt {
+	margin: -0.1em 0 0.5em;
+	color: var(--tfb-ai);
+	font-size: 0.93em;
+}
+
+.tfb-u .tfb-txt,
+.tfb-blk .tfb-txt {
+	margin-bottom: 0.7em;
+}
+
+.tfb-blk .tfb-md > :first-child {
+	margin-top: 0;
+}
+
+.tfb-blk .tfb-md > :last-child {
+	margin-bottom: 0;
+}
+
+.tfb-u.tfb-cap .tfb-txt {
+	font-size: 0.9em;
+	color: var(--text-muted);
+}
+
+.tfb-u.tfb-fold .tfb-txt {
+	cursor: zoom-in;
+}
+
+.tfb-u.tfb-unf .tfb-txt {
+	cursor: zoom-out;
+	background-color: var(--tfb-accent-soft);
+	box-shadow: 0 0 0 4px var(--tfb-accent-soft);
+	border-radius: 2px;
+}
+
+/* the model's words: a thin line at their left, nothing that moves the words */
+.tfb-txt.tfb-ai {
+	box-shadow: inset 2px 0 0 color-mix(in srgb, var(--tfb-ai) 45%, transparent);
+	padding-left: 8px;
+	margin-left: -10px;
+}
+
+.tfb-tk {
+	display: inline-block;
+	transform-origin: 0 0;
+	white-space: pre;
+}
+
+.tfb-tk.tfb-hd {
+	white-space: normal;
+}
+
+.tfb-wg {
+	white-space: nowrap;
+}
+
+.tfb-tk.tfb-hl,
+.tfb-hlsp {
+	background-color: var(--text-highlight-bg);
+}
+
+.tfb-tk.tfb-gap {
+	color: var(--text-faint);
+	padding: 0 0.2em;
+}
+
+.tfb-l1 .tfb-blk .tfb-tk:not(.tfb-lead) {
+	color: color-mix(in srgb, var(--text-normal) 82%, transparent);
+}
+
+.tfb-l2 .tfb-u .tfb-tk:not(.tfb-lead),
+.tfb-l3 .tfb-u .tfb-tk:not(.tfb-lead),
+.tfb-l4 .tfb-u .tfb-tk:not(.tfb-lead) {
+	color: var(--text-muted);
+}
+
+.tfb-u.tfb-unf .tfb-tk {
+	color: var(--text-normal);
+}
+
+.tfb-box {
+	transform-origin: 0 0;
+}
+
+.tfb-dot {
+	display: inline-block;
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background-color: var(--interactive-accent);
+	vertical-align: middle;
+}
+
+.tfb-mk {
+	margin-left: 4px;
+	cursor: help;
+}
+
+.tfb-mn {
+	display: grid;
+	gap: 3px;
+	padding-top: 0.15em;
+	cursor: pointer;
+}
+
+.tfb-mn + .tfb-mn {
+	margin-top: 10px;
+}
+
+.tfb-mh {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+}
+
+.tfb-mn.is-ask .tfb-mh,
+.tfb-cbox.is-ask .tfb-mh {
+	color: var(--tfb-ai);
+}
+
+.tfb-lost-tag {
+	color: var(--text-warning);
+}
+
+.tfb-mn.tfb-short {
+	display: block;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	color: var(--text-muted);
+}
+
+.tfb-mn.tfb-dotonly {
+	padding-top: 0.45em;
+	cursor: help;
+}
+
+.tfb-cbox {
+	margin: 2px 0 12px;
+	padding: 6px 10px;
+	border-radius: var(--radius-s);
+	background-color: var(--tfb-accent-soft);
+	font-size: var(--font-ui-small);
+	cursor: pointer;
+}
+
+.tfb-cbox.is-ask {
+	background-color: var(--tfb-ai-soft);
+}
+
+.tfb-q {
+	font-weight: var(--font-semibold);
+}
+
+.tfb-quote {
+	color: var(--text-muted);
+}
+
+.tfb-ntext {
+	white-space: pre-wrap;
+}
+
+.tfb-whole .tfb-gut {
+	padding-top: 0.6em;
+}
+
+.tfb-mapnote .tfb-txt {
+	margin-top: 10px;
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
+.tfb-map {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+	gap: 8px;
+	margin-top: 14px;
+}
+
+.tfb-card {
+	display: grid;
+	align-content: start;
+	gap: 4px;
+	padding: 7px 9px 8px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-m);
+	background-color: var(--background-primary);
+	cursor: pointer;
+}
+
+.tfb-card:hover {
+	border-color: var(--interactive-accent);
+}
+
+.tfb-cs {
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+}
+
+.tfb-cp {
+	font-size: var(--font-ui-medium);
+	font-weight: var(--font-semibold);
+	line-height: 1.25;
+}
+
+.tfb-cps {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 3px;
+}
+
+.tfb-chip {
+	max-width: 100%;
+	overflow: hidden;
+	padding: 0 5px;
+	border: 1px solid var(--background-modifier-border);
+	border-radius: var(--radius-s);
+	background-color: var(--background-secondary);
+	font-size: var(--font-ui-smaller);
+	line-height: 1.5;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	cursor: pointer;
+}
+
+.tfb-chip:hover {
+	border-color: var(--interactive-accent);
+}
+
+.tfb-chip.has-note {
+	box-shadow: inset 2px 0 0 var(--interactive-accent);
+}
+
+.tfb-ev {
+	margin: 0 0 6px;
+	padding-left: 8px;
+	border-left: 2px solid var(--background-modifier-border);
+}
+
+/* a word leaving: a ghost where it was, fading */
+.tfb-ghosts {
+	position: fixed;
+	left: var(--tfb-gl, 0);
+	top: var(--tfb-gt, 0);
+	width: var(--tfb-gw, 0);
+	height: var(--tfb-gh, 0);
+	overflow: hidden;
+	pointer-events: none;
+	z-index: 5;
+}
+
+.tfb-ghost {
+	position: absolute;
+	left: var(--tfb-x);
+	top: var(--tfb-y);
+	width: var(--tfb-w);
+	height: var(--tfb-h);
+	margin: 0;
+	overflow: hidden;
+	box-sizing: border-box;
+	white-space: pre;
+	font: var(--tfb-font);
+	color: var(--tfb-color);
+	background-color: var(--tfb-bg);
+	transform: none;
+}
+
+.tfb-morphing {
+	overflow-anchor: none;
+}
+
+.tfb-notice-actions {
+	display: flex;
+	gap: 6px;
+	margin-top: 6px;
+}

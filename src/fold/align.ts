@@ -113,8 +113,11 @@ export interface PreparedUnit {
 	sentences: string[];
 }
 
+/** A highlight's passage: its text, and its first and last word in the unit when TextFold kept them (in this language). */
+export type Passage = string | { quote: string; tokens?: [number, number] };
+
 /** A unit of TextFold's document, prepared; `quotes` are the passages of the reader's highlights on it. */
-export function prepUnit(u: DocUnit & { sentences?: string[]; evidence?: number[] }, quotes: string[] = []): PreparedUnit {
+export function prepUnit(u: DocUnit & { sentences?: string[]; evidence?: number[] }, quotes: Passage[] = []): PreparedUnit {
 	const pre = `${u.id}:`;
 	const sentences = u.sentences?.length ? u.sentences : [u.full];
 	const toks: Token[] = [];
@@ -130,7 +133,14 @@ export function prepUnit(u: DocUnit & { sentences?: string[]; evidence?: number[
 	});
 	const full = sentences.join(" ");
 	const hl = new Set<number>();
-	for (const q of quotes) {
+	for (const m of quotes) {
+		const q = typeof m === "string" ? m : m.quote;
+		const tk = typeof m === "string" ? undefined : m.tokens;
+		// TextFold's words, when they still read as the passage (a phrase can be in a paragraph twice)
+		if (tk && tk[0] >= 0 && tk[0] <= tk[1] && tk[1] < toks.length && sq(toks.slice(tk[0], tk[1] + 1).map(t => t.t).join("")) === sq(q)) {
+			for (let i = tk[0]; i <= tk[1]; i++) hl.add(i);
+			continue;
+		}
 		if (!q) continue;
 		const at = full.indexOf(q);
 		if (at < 0) continue;
@@ -187,13 +197,15 @@ export function piecesOf(u: PreparedUnit, level: Level, unfolded = false): Piece
 			for (let i = a; i < b; i++) out.push({ id: pre + i, t: u.toks[i].t, s: !!u.toks[i].s, lead: ev.has(s), hl: u.hl.has(i) });
 		});
 	} else if (level === "brief") {
-		let prevEnd: number | null = null;
+		// a gap (…) wherever sentences were left out: before, between and after the ones kept, as in TextFold
+		let prevEnd = 0;
 		for (const s of u.ev) {
 			const [a, b] = u.sr[s];
-			if (prevEnd !== null && a !== prevEnd) out.push({ id: `${pre}gap${s}`, t: "…", gap: true });
+			if (a !== prevEnd) out.push({ id: `${pre}gap${s}`, t: "…", gap: true });
 			for (let i = a; i < b; i++) out.push({ id: pre + i, t: u.toks[i].t, s: !!u.toks[i].s, lead: u.km.has(i), hl: u.hl.has(i) });
 			prevEnd = b;
 		}
+		if (out.length && prevEnd < u.toks.length) out.push({ id: `${pre}gapz`, t: "…", gap: true });
 	} else if (level === "key") {
 		const tn = u.tt.length;
 		u.kt.forEach((x, j) => out.push({ id: x.id, t: x.t, s: !!x.s, lead: j < tn, hl: x.hl }));

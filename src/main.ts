@@ -117,7 +117,7 @@ export default class TextFoldBridgePlugin extends Plugin {
 		const recent = workspace.getMostRecentLeaf();
 		const showing = recent?.view instanceof MarkdownView && recent.view.file === file ? recent : workspace.getLeavesOfType("markdown").find(l => l.view instanceof MarkdownView && l.view.file === file);
 		const leaf = showing ?? workspace.getLeaf("tab");
-		await leaf.setViewState({ type: FOLD_VIEW, state: { file: file.path, level: this.settings.foldStart }, active: true });
+		await leaf.setViewState({ type: FOLD_VIEW, state: { file: file.path, level: this.settings.foldStart, auto: true }, active: true });
 		await workspace.revealLeaf(leaf);
 	}
 

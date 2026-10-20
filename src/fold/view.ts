@@ -32,6 +32,7 @@ interface Cached {
 export class FoldView extends FileView {
 	level: Level = "full";
 	lang: string | null = null; // this note's language when another than the setting's
+	private auto = false; // opened by "Fold this note" just now: it may send the note to TextFold (a restored view only offers to)
 	private run = 0;
 	private blocks: NoteBlock[] = [];
 	private rendered = new Map<number, HTMLElement>();
@@ -84,7 +85,8 @@ export class FoldView extends FileView {
 	}
 
 	async setState(state: unknown, result: ViewStateResult): Promise<void> {
-		const s = (state ?? {}) as { level?: unknown; lang?: unknown };
+		const s = (state ?? {}) as { level?: unknown; lang?: unknown; auto?: unknown };
+		this.auto = s.auto === true;
 		if (typeof s.level === "string" && (FOLD_LEVELS as string[]).includes(s.level)) this.level = s.level as Level;
 		if (typeof s.lang === "string" || s.lang === null) this.lang = s.lang;
 		await super.setState(state, result);
@@ -228,7 +230,7 @@ export class FoldView extends FileView {
 				this.clearDoc();
 				this.say(`TextFold is not running at ${r.url}: the note as written.`);
 			}
-			this.draw();
+			this.drawAll();
 			return;
 		}
 		const job = rec ? folds.running(rec.paper) : null;
@@ -236,15 +238,24 @@ export class FoldView extends FileView {
 			this.folding = true;
 			this.sayJob(job);
 			this.clearDoc();
-			this.draw();
+			this.drawAll();
 			return;
 		}
 		const state = rec ? await folds.state(file, rec) : null;
-		if ((!rec || state?.kind === "changed") && !this.triedFold) {
+		if ((!rec || state?.kind === "changed") && !this.triedFold && !this.auto) {
+			// a view restored with the workspace never sends the note by itself: it offers to
+			this.clearDoc();
+			this.say(rec ? "Changed since it was folded." : "The note has no TextFold document yet: the note as written.", [rec ? "Refold" : "Fold", () => this.foldNow()]);
+			if (!rec) {
+				this.drawAll();
+				return;
+			}
+		}
+		if ((!rec || state?.kind === "changed") && !this.triedFold && this.auto) {
 			this.triedFold = true;
 			this.clearDoc();
 			this.say(rec ? "Changed since it was folded: folding it again in TextFold…" : "Sending the note to TextFold…");
-			this.draw();
+			this.drawAll();
 			const out = await folds.fold(file, { quiet: true, lang: rec?.lang ?? want });
 			if (run !== this.run) return;
 			if (out === "started") {
@@ -262,7 +273,7 @@ export class FoldView extends FileView {
 		if (!now) {
 			this.clearDoc();
 			this.say("The note has no TextFold document: the note as written.", ["Fold", () => this.refold()]);
-			this.draw();
+			this.drawAll();
 			return;
 		}
 		const doc = await client.doc(now.paper, want).catch(() => null);
@@ -271,7 +282,7 @@ export class FoldView extends FileView {
 		if (!doc) {
 			this.clearDoc();
 			this.say(`TextFold has no document ${now.paper} any more: the note as written.`);
-			this.draw();
+			this.drawAll();
 			return;
 		}
 		this.use(now.paper, doc, notes, false);
@@ -280,7 +291,7 @@ export class FoldView extends FileView {
 		else if (doc.lang !== want) this.say(`Not in ${langName(this.plugin, want)} yet: shown in ${langName(this.plugin, doc.lang)}.`, ["Translate", () => void this.translate(want)]);
 		else if (state?.kind === "changed") this.say("Changed since it was folded.", ["Refold", () => this.refold(true)]);
 		else this.say("");
-		this.draw();
+		this.drawAll();
 	}
 
 	private use(paper: string, doc: Doc, notes: NotesFile | null, offline: boolean): void {
@@ -298,7 +309,7 @@ export class FoldView extends FileView {
 		for (const s of doc.sections) {
 			this.secs.set(s.id, prepSection(s));
 			for (const u of s.units) {
-				const quotes = (this.notesBy.get(u.id) ?? []).filter(x => x.kind !== "ask" && !x.lost).map(x => x.quote);
+				const quotes = (this.notesBy.get(u.id) ?? []).filter(x => x.kind !== "ask" && !x.lost).map(x => ({ quote: x.quote, tokens: !x.lang || x.lang === doc.lang ? x.tokens : undefined }));
 				this.units.set(u.id, prepUnit(u, quotes));
 				this.unitDoc.set(u.id, u);
 				this.unitSec.set(u.id, s);
@@ -324,6 +335,14 @@ export class FoldView extends FileView {
 			return;
 		}
 		this.folding = false;
+		void this.reload(this.file, false);
+	}
+
+	/** The Fold / Refold button of a view that did not fold by itself. */
+	private foldNow(): void {
+		if (!this.file) return;
+		this.auto = true;
+		this.triedFold = false;
 		void this.reload(this.file, false);
 	}
 
@@ -424,7 +443,7 @@ export class FoldView extends FileView {
 		bar.createDiv("tfb-grow");
 		// the note's language: another one is translated by TextFold
 		const select = bar.createEl("select", { cls: "dropdown tfb-lang", attr: { "aria-label": "Language" } });
-		const current = this.doc?.lang ?? this.lang ?? this.plugin.foldLanguage();
+		const current = this.lang ?? this.plugin.foldLanguage(); // the one asked for (the line says when it is shown in another)
 		for (const l of this.plugin.langs ?? FALLBACK_LANGS) select.createEl("option", { value: l.code, text: l.name });
 		select.value = current;
 		select.disabled = !this.doc || this.offline;
@@ -472,11 +491,17 @@ export class FoldView extends FileView {
 
 	// ---------------------------------------------------------------- drawing
 
-	private draw(): void {
+	/** Everything anew: the controls and the document (after loading, or a setting changed). */
+	private drawAll(): void {
 		this.motion?.stop();
+		this.drawBar();
+		this.draw();
+	}
+
+	/** The document at the level (a motion's step draws this, so it never touches the motion or the controls). */
+	private draw(): void {
 		this.hideHover();
 		this.cold.clear();
-		this.drawBar();
 		const body = this.docEl;
 		body.empty();
 		const level: Level = this.doc && !this.doc.local ? this.level : "full";
@@ -575,7 +600,7 @@ export class FoldView extends FileView {
 		const unf = this.unf.has(u.id);
 		const pcs = piecesOf(p, level, unf);
 		if (!pcs.length) return;
-		const { row, gut, txt, mar } = this.row(`tfb-u tfb-fold${unf ? " tfb-unf" : ""}${u.kind === "caption" ? " tfb-cap" : ""}`, u.id);
+		const { row, gut, txt, mar } = this.row(`tfb-u tfb-folded${unf ? " tfb-unf" : ""}${u.kind === "caption" ? " tfb-cap" : ""}`, u.id);
 		row.dataset.u = u.id;
 		if (u.role) gut.appendChild(piece({ id: `${u.id}:role`, t: ROLE[u.role] ?? u.role }, `tfb-role tfb-r-${u.role}`));
 		if (unf) gut.createSpan({ cls: "tfb-full-tag", text: "Full" });
@@ -600,7 +625,7 @@ export class FoldView extends FileView {
 		txt.setText(`${secs.length} section${secs.length === 1 ? "" : "s"}. Click a card for its takeaways, a chip for that paragraph in full.`);
 		const map = this.docEl.createDiv("tfb-map");
 		for (const s of secs) {
-			const card = map.createDiv({ cls: "tfb-card tfb-fl", attr: { tabindex: "0" } });
+			const card = map.createDiv({ cls: "tfb-mcard tfb-fl", attr: { tabindex: "0" } });
 			card.dataset.anchor = s.id;
 			card.dataset.card = s.id;
 			const head = card.createDiv("tfb-cs");
@@ -794,7 +819,7 @@ export class FoldView extends FileView {
 			if (x) void this.plugin.opener.open(noteLink(this.paper, x));
 			return;
 		}
-		const u = t.closest<HTMLElement>(".tfb-u.tfb-fold");
+		const u = t.closest<HTMLElement>(".tfb-u.tfb-folded");
 		if (u && t.closest(".tfb-txt") && !t.closest(".tfb-mk")) {
 			const id = u.dataset.u ?? "";
 			this.hideHover();
@@ -812,6 +837,7 @@ export class FoldView extends FileView {
 		this.level = lv(k);
 		this.unf.clear();
 		this.draw();
+		this.drawBar();
 		this.app.workspace.requestSaveLayout();
 	}
 

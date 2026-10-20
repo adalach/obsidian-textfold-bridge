@@ -43,6 +43,8 @@ describe("pieces per level", () => {
 		expect(piecesText(brief)).toBe("Convex zones keep thermal models simple. … EnergyPlus runs faster with them.");
 		expect(brief[0].id).toBe("p-1a2b3c4d:0");
 		expect(brief.find(x => x.gap)).toBeTruthy();
+		const later = piecesText(piecesOf(prepUnit({ ...unit, evidence: [1] }), "brief"));
+		expect(later).toBe("… They avoid irregular rooms. …");
 	});
 
 	it("gives the model's words at Key the ids of the author's words they match", () => {
@@ -61,6 +63,14 @@ describe("pieces per level", () => {
 		expect(take.map(x => x.id)).toEqual(key.slice(0, take.length).map(x => x.id));
 		expect(topic.map(x => x.t)).toEqual(["thermal", "models"]);
 		expect(topic.map(x => x.id)).toEqual(take.filter(x => x.t === "thermal" || x.t === "models").map(x => x.id));
+	});
+
+	it("marks a highlight at TextFold's words when a phrase is in the paragraph twice", () => {
+		const twice = { ...unit, full: "Zones help. Zones help models.", sentences: ["Zones help.", "Zones help models."], evidence: [1] };
+		const at = (q: Parameters<typeof prepUnit>[1]) => [...prepUnit(twice, q).hl];
+		expect(at(["Zones help"])).toEqual([0, 1]);
+		expect(at([{ quote: "Zones help", tokens: [3, 4] }])).toEqual([3, 4]);
+		expect(at([{ quote: "Zones help", tokens: [4, 5] }])).toEqual([0, 1]); // words that no longer read as the passage
 	});
 
 	it("opens one paragraph at Full on its own", () => {

@@ -632,7 +632,7 @@
 	color: var(--text-muted);
 }
 
-.tfb-u.tfb-fold .tfb-txt {
+.tfb-u.tfb-folded .tfb-txt {
 	cursor: zoom-in;
 }
 
@@ -789,7 +789,7 @@
 	margin-top: 14px;
 }
 
-.tfb-card {
+.tfb-mcard {
 	display: grid;
 	align-content: start;
 	gap: 4px;
@@ -800,7 +800,7 @@
 	cursor: pointer;
 }
 
-.tfb-card:hover {
+.tfb-mcard:hover {
 	border-color: var(--interactive-accent);
 }
 

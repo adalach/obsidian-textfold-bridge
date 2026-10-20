@@ -26,7 +26,7 @@ export default class TextFoldBridgePlugin extends Plugin {
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
-		this.client = new TextFoldClient(() => ({ mode: this.settings.addressMode, manualUrl: this.settings.manualUrl }));
+		this.client = new TextFoldClient(() => ({ mode: this.settings.addressMode, manualUrl: this.settings.manualUrl, folder: this.settings.sourceFolder }));
 		this.opener = new LinkOpener(this.client, () => this.settings.openIn);
 		this.opener.install(this);
 		this.previews = new LinkPreviews(this, this.client, () => this.settings.hoverPreviews);

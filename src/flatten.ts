@@ -2,7 +2,7 @@
 // as written. No runtime imports from obsidian; test/flatten.test.ts covers it.
 //
 //   [[a|b]] -> b   [[a]] -> a   [[a#h]] -> a > h   ![[embed]] and ![image](…) dropped   %% comment %% dropped
-//   > [!note] Title -> > Title   ==highlight== -> highlight   block ids (^abc) dropped   front matter replaced
+//   > [!note] Title -> > **Title**   ==highlight== -> highlight   block ids (^abc) dropped   front matter replaced
 // Code (fenced blocks and inline spans) is left exactly as written.
 
 const FENCE = /^\s{0,3}(`{3,}|~{3,})/;
@@ -59,7 +59,7 @@ function flattenProse(text: string): string {
 		.split("\n")
 		.flatMap(line => {
 			const callout = /^(\s*(?:>\s*)+)\[![\w-]+\][+-]?\s*(.*)$/.exec(line);
-			if (callout) return callout[2].trim() ? [`${callout[1]}${callout[2].trim()}`] : [];
+			if (callout) return callout[2].trim() ? [`${callout[1]}**${callout[2].trim()}**`, callout[1].trimEnd()] : [];
 			if (/^\s*\^[\w-]+\s*$/.test(line)) return [];
 			return [line.replace(/\s+\^[\w-]+\s*$/, "")];
 		})

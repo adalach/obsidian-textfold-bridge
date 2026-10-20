@@ -1,6 +1,6 @@
 {
   "name": "textfold-bridge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Links from Obsidian notes to papers and notes in TextFold, the local reader that folds a paper into five zoom levels.",
   "author": "Agata Dalach",

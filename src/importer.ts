@@ -60,7 +60,7 @@ export class Importer {
 			const props: Record<string, unknown> = {
 				textfold: id,
 				title,
-				authors: doc?.authors.length ? doc.authors : paper?.authors ?? [],
+				authors: doc?.authors.length ? doc.authors : paper?.authors.length ? paper.authors : undefined,
 				year: yearOf(doc?.date ?? ""),
 				citekey: paper?.citekey,
 				link: buildLink({ paper: id }),

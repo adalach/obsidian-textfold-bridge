@@ -2,7 +2,7 @@
 // note's `textfold:` property, and folded in a language. The plugin keeps, per document, a hash of what it sent, so it
 // can tell when the note has changed since; a refold puts the new text in place of the old under the same id (TextFold
 // finds its notes again in it) and folds it again. Progress comes from GET /api/jobs while a fold runs.
-import { App, Notice, TFile } from "obsidian";
+import { App, Modal, Notice, Setting, TFile } from "obsidian";
 import { Job, TextFoldClient, TextFoldError } from "./client";
 import { flattenNote, textHash } from "./flatten";
 import { isPaperId, withId, withoutId } from "./links";
@@ -58,9 +58,10 @@ export class Folds {
 	async state(file: TFile, rec: FoldRecord): Promise<FoldState> {
 		const job = this.jobs.get(rec.paper);
 		if (job && (job.status === "queued" || job.status === "running")) return { kind: "folding", job };
-		if (job?.status === "error") return { kind: "failed", error: job.error === "no-model" ? "TextFold has no model connected" : job.error || "unknown error" };
 		const { hash } = await this.prepare(file);
-		return hash === rec.hash ? { kind: "folded" } : { kind: "changed" };
+		if (hash !== rec.hash) return { kind: "changed" };
+		if (job?.status === "error") return { kind: "failed", error: job.error === "no-model" ? "no model is connected in TextFold, so it reads as written" : job.error || "unknown error" };
+		return { kind: "folded" };
 	}
 
 	/** Fold the note, or fold it again when it has changed since. */
@@ -79,8 +80,11 @@ export class Folds {
 		}
 		try {
 			if (rec && rec.hash === hash && rec.lang === lang) {
-				new Notice("This note has not changed since it was folded.");
-				return;
+				const doc = await this.client.doc(rec.paper, lang).catch(() => null);
+				if (!doc?.local) {
+					new Notice("This note has not changed since it was folded.");
+					return;
+				} // else stored without levels (no model then): fold it now
 			}
 			let paper: string;
 			let force = false;
@@ -96,8 +100,9 @@ export class Folds {
 					throw e;
 				}
 				force = true;
-			} else if (rec) paper = rec.paper; // the same text, in another language
+			} else if (rec) paper = rec.paper; // the same text: in another language, or still without levels
 			else {
+				if (!(await confirmFold(this.app, file, lang))) return;
 				paper = (await this.client.importText(`${file.basename}.md`, text)).paper;
 				await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
 					fm.textfold = withId(fm.textfold, paper);
@@ -186,6 +191,30 @@ function propertyIds(app: App, file: TFile): string[] {
 	const v: unknown = app.metadataCache.getFileCache(file)?.frontmatter?.textfold;
 	const list: unknown[] = Array.isArray(v) ? v : [v];
 	return list.map(x => (typeof x === "number" ? String(x) : x)).filter((x): x is string => typeof x === "string" && isPaperId(x.trim())).map(x => x.trim());
+}
+
+/** A note's first fold, asked once: it sends the note's text to TextFold, and TextFold's model writes its levels. */
+function confirmFold(app: App, file: TFile, lang: string): Promise<boolean> {
+	return new Promise(resolve => {
+		let answered = false;
+		const modal = new Modal(app);
+		const answer = (yes: boolean) => {
+			answered = true;
+			resolve(yes);
+			modal.close();
+		};
+		modal.setTitle(`Fold "${file.basename}" in TextFold?`);
+		modal.contentEl.createEl("p", {
+			text: `TextFold stores the note's text and writes its levels in ${lang} with the model set up in TextFold. The note gets a textfold property with the document's id.`,
+		});
+		new Setting(modal.contentEl)
+			.addButton(b => b.setButtonText("Cancel").onClick(() => answer(false)))
+			.addButton(b => b.setButtonText("Fold").setCta().onClick(() => answer(true)));
+		modal.onClose = () => {
+			if (!answered) resolve(false);
+		};
+		modal.open();
+	});
 }
 
 function foldError(e: unknown): string {

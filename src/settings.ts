@@ -7,6 +7,7 @@ import { DEFAULT_URL, Resolved, loopbackUrl } from "./server";
 export interface BridgeSettings {
 	addressMode: "auto" | "manual"; // auto: server.json in TextFold's data folder, else DEFAULT_URL
 	manualUrl: string;
+	sourceFolder: string; // a clone of TextFold, whose server writes server.json there; also looked in by Automatic
 	openIn: "browser" | "app"; // browser: the reader page on the running server; app: textfold:// for TextFold to open
 	hoverPreviews: boolean;
 	foldLang: string; // the language "Fold this note" folds in
@@ -17,6 +18,7 @@ export interface BridgeSettings {
 export const DEFAULT_SETTINGS: BridgeSettings = {
 	addressMode: "auto",
 	manualUrl: DEFAULT_URL,
+	sourceFolder: "",
 	openIn: "browser",
 	hoverPreviews: true,
 	foldLang: "en",
@@ -61,6 +63,12 @@ export class BridgeSettingTab extends PluginSettingTab {
 					placeholder: DEFAULT_URL,
 					validate: (v: string) => (loopbackUrl(v) ? undefined : "Use an address on 127.0.0.1 with a port, such as http://127.0.0.1:3017."),
 				},
+			},
+			{
+				name: "TextFold run from source",
+				desc: "A TextFold started from a clone of its repository writes its server.json in the clone's folder. Name that folder to have Automatic look there first.",
+				visible: () => s().addressMode === "auto",
+				control: { type: "text", key: "sourceFolder", defaultValue: DEFAULT_SETTINGS.sourceFolder, placeholder: "~/textfold" },
 			},
 			{
 				name: "Connection",
@@ -139,6 +147,7 @@ export class BridgeSettingTab extends PluginSettingTab {
 		const text = typeof value === "string" ? value.trim() : "";
 		if (key === "addressMode") s.addressMode = value === "manual" ? "manual" : "auto";
 		else if (key === "manualUrl") s.manualUrl = loopbackUrl(text) ?? text;
+		else if (key === "sourceFolder") s.sourceFolder = text;
 		else if (key === "openIn") s.openIn = value === "app" ? "app" : "browser";
 		else if (key === "hoverPreviews") s.hoverPreviews = value === true;
 		else if (key === "foldLang") s.foldLang = text || DEFAULT_SETTINGS.foldLang;
@@ -146,7 +155,7 @@ export class BridgeSettingTab extends PluginSettingTab {
 		else if (key === "importNames") s.importNames = value === "citekey" ? "citekey" : "title";
 		await this.plugin.saveSettings();
 		if (key === "addressMode") this.update();
-		if (key === "addressMode" || key === "manualUrl") {
+		if (key === "addressMode" || key === "manualUrl" || key === "sourceFolder") {
 			this.plugin.client.reset();
 			this.recheck();
 		}

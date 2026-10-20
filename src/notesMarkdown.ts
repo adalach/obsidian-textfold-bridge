@@ -28,7 +28,7 @@ export function groupNotes(notes: Note[], index: DocIndex | null): NoteGroup[] {
 	const groups: NoteGroup[] = [];
 	for (const n of sorted) {
 		const s = isWhole(n) ? null : index?.sectionOf(n.unit, n.section);
-		const name = isWhole(n) ? WHOLE : s ? sectionName(s) : n.section ?? "";
+		const name = isWhole(n) ? WHOLE : s ? sectionName(s) : index ? "" : n.section ?? "";
 		const last = groups[groups.length - 1];
 		if (last && last.name === name) last.notes.push(n);
 		else groups.push({ name, notes: [n] });

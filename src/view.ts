@@ -205,7 +205,7 @@ export class TextFoldNotesView extends ItemView {
 				else this.collapsed.delete(item.id);
 				this.render();
 			});
-			if (this.fold?.rec.paper === item.id && reachable) this.foldRow(list, this.fold);
+			if (this.fold?.rec.paper === item.id && reachable) this.foldRow(list, this.fold, item.doc);
 			if (!open) continue;
 			for (const g of groups) {
 				if (g.name && (groups.length > 1 || g.name !== WHOLE)) list.createDiv({ cls: "tfb-section", text: g.name });
@@ -233,7 +233,7 @@ export class TextFoldNotesView extends ItemView {
 	}
 
 	/** The fold of this note: under way, failed, changed since, or done; with Refold or Open as fits. */
-	private foldRow(list: HTMLElement, fold: Fold): void {
+	private foldRow(list: HTMLElement, fold: Fold, doc: Doc | null): void {
 		const row = list.createDiv({ cls: "tfb-row tfb-item tfb-fold" });
 		const icon = row.createDiv("tfb-kind");
 		const text = row.createDiv("tfb-text");
@@ -253,6 +253,10 @@ export class TextFoldNotesView extends ItemView {
 		} else if (st.kind === "changed") {
 			setIcon(icon, "pencil");
 			text.setText("Changed since folding");
+			action = ["Refold", refold];
+		} else if (doc?.local) { // stored, but no model wrote its levels: it reads as written
+			setIcon(icon, "alert-triangle");
+			text.setText("In TextFold without levels: no model was connected");
 			action = ["Refold", refold];
 		} else {
 			setIcon(icon, "check");

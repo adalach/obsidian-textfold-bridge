@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { DEFAULT_URL, dataFolders, loopbackUrl, parseServerFile, processAlive, resolveServer } from "../src/server";
+import { DEFAULT_URL, dataFolders, expandHome, loopbackUrl, parseServerFile, processAlive, resolveServer } from "../src/server";
 
 const serverFile = (port: number, pid = process.pid) => JSON.stringify({
 	format: "textfold/server", version: 1, url: `http://127.0.0.1:${port}`, port, pid, textfold: "0.10.14", started: "2026-10-20T09:00:00Z",
@@ -18,6 +18,14 @@ describe("dataFolders", () => {
 
 	it("looks in TEXTFOLD_DATA first", () => {
 		expect(dataFolders("darwin", { TEXTFOLD_DATA: "/tmp/tf" }, "/Users/a")).toEqual(["/tmp/tf", "/Users/a/Library/Application Support/TextFold"]);
+	});
+});
+
+describe("expandHome", () => {
+	it("reads ~ as the home folder", () => {
+		expect(expandHome("~/textfold", "/Users/a")).toBe("/Users/a/textfold");
+		expect(expandHome("~", "/Users/a")).toBe("/Users/a");
+		expect(expandHome(" /opt/textfold ", "/Users/a")).toBe("/opt/textfold");
 	});
 });
 

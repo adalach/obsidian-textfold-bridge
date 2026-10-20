@@ -31,6 +31,12 @@ export function dataFolders(platform: string = process.platform, env: Record<str
 	return [...new Set(dirs)];
 }
 
+/** A folder typed with ~ for the home folder. */
+export function expandHome(path: string, home: string = homedir()): string {
+	const p = path.trim();
+	return p === "~" ? home : p.startsWith("~/") ? join(home, p.slice(2)) : p;
+}
+
 /** An address TextFold may be at: http on 127.0.0.1 (or localhost, rewritten) with a port, nothing after it.
  *  Returns the normalized URL, or null for anything else: the plugin talks to no other host. */
 export function loopbackUrl(text: string): string | null {

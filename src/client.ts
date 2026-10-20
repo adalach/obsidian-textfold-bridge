@@ -4,9 +4,9 @@
 import { requestUrl } from "obsidian";
 import { Doc, parseDoc } from "./doc";
 import { NotesFile, Paper, parseNotes, parsePapers } from "./notes";
-import { Resolved, loopbackUrl, resolveServer } from "./server";
+import { Resolved, dataFolders, expandHome, loopbackUrl, resolveServer } from "./server";
 
-export type Address = { mode: "auto" | "manual"; manualUrl: string };
+export type Address = { mode: "auto" | "manual"; manualUrl: string; folder: string }; // folder: a clone of TextFold, also looked in
 
 export type ErrorKind = "unreachable" | "http" | "format" | "busy" | "missing" | "refused";
 
@@ -66,8 +66,9 @@ export class TextFoldClient {
 	check(): Promise<Resolved> {
 		this.checking ??= (async () => {
 			try {
-				const { mode, manualUrl } = this.address();
-				const r = await resolveServer(mode, manualUrl, { probe: url => this.probe(url) });
+				const { mode, manualUrl, folder } = this.address();
+				const folders = [...(folder ? [expandHome(folder)] : []), ...dataFolders()];
+				const r = await resolveServer(mode, manualUrl, { folders, probe: url => this.probe(url) });
 				if (r.url !== this.resolved?.url) this.docs.clear();
 				this.resolved = { ...r, at: Date.now() };
 				this.emit();

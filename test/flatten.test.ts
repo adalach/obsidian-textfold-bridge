@@ -13,7 +13,7 @@ describe("flattenNote", () => {
 	});
 
 	it("turns callouts into plain quotes", () => {
-		expect(flattenNote("> [!note] A title\n> Body line.\n\n> [!warning]-\n> Only body.")).toBe("> A title\n> Body line.\n\n> Only body.\n");
+		expect(flattenNote("> [!note] A title\n> Body line.\n\n> [!warning]-\n> Only body.")).toBe("> **A title**\n>\n> Body line.\n\n> Only body.\n");
 	});
 
 	it("drops block ids and highlight marks", () => {

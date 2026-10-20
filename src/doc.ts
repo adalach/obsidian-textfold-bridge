@@ -68,7 +68,7 @@ export function parseDoc(data: unknown): Doc | null {
 
 /** What TextFold's reader calls a section: its number and title ("3 Results"); formulas without their dollars. */
 export function sectionName(s: DocSection): string {
-	return `${s.num ? `${s.num} ` : ""}${s.title.replace(/\$/g, "")}`.trim() || s.id;
+	return `${s.num ? `${s.num} ` : ""}${s.title.replace(/\$/g, "")}`.trim(); // "" for the untitled opening section
 }
 
 /** A unit's text at a level: the author's words at Full and Brief, the model's at Key, Takeaway and Topic; the full

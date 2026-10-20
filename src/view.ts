@@ -288,7 +288,10 @@ export class TextFoldNotesView extends ItemView {
 		const icon = note ? KIND_ICON[note.kind] : c.link.n ? "sticky-note" : c.link.u ? "pilcrow" : c.link.s ? "heading" : "file-text";
 		const row = list.createDiv({ cls: "tfb-row tfb-item tfb-cite" });
 		setIcon(row.createDiv("tfb-kind"), icon);
-		row.createDiv({ cls: "tfb-text", text: text.replace(/\s+/g, " ") });
+		// a range of paragraphs: its first, and how many follow in a label of their own, out of reach of the ellipsis
+		const more = / … \(\+(\d+)\)$/.exec(text);
+		row.createDiv({ cls: "tfb-text", text: (more ? text.slice(0, more.index) : text).replace(/\s+/g, " ") });
+		if (more) row.createDiv({ cls: "tfb-more", text: `+${more[1]}`, attr: { "aria-label": `And ${more[1]} more paragraph${more[1] === "1" ? "" : "s"}` } });
 		if (meta) row.createDiv({ cls: "tfb-meta", text: meta });
 		const missing = this.reachable && !!it && !it.file;
 		if (missing) row.addClass("tfb-muted");

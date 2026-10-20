@@ -71,6 +71,16 @@
 	font-weight: var(--font-semibold);
 }
 
+/* how many more paragraphs a range link covers, after its first */
+.tfb-more {
+	flex: none;
+	padding: 0 4px;
+	border-radius: var(--radius-s);
+	background-color: var(--background-modifier-hover);
+	color: var(--text-muted);
+	font-size: var(--font-ui-smaller);
+}
+
 .tfb-meta {
 	flex: none;
 	max-width: 38%;

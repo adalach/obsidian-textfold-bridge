@@ -7,6 +7,7 @@ import { Component, HoverParent, HoverPopover, Keymap, MarkdownRenderer, Plugin,
 import type { TextFoldClient } from "./client";
 import { DocIndex, sectionName, sectionText, unitText } from "./doc";
 import { Level, TextFoldLink, parseLink } from "./links";
+import { keepOutOfLists } from "./drag";
 import { NotesFile, Paper, citationLinks, noteLine } from "./notes";
 import { missingPaper } from "./opener";
 
@@ -148,7 +149,7 @@ export class LinkPreviews {
 			const st = index ? sectionText(index, s.id, level) : null;
 			if (s.title) body.createDiv({ cls: "tfb-hover-title", text: sectionName(s) });
 			const text = body.createDiv("tfb-hover-text markdown-rendered");
-			if (st?.text) await MarkdownRenderer.render(this.plugin.app, capBlocks(st.text).replace(/\[\[/g, "\\[\\["), text, "", owner);
+			if (st?.text) await MarkdownRenderer.render(this.plugin.app, keepOutOfLists(capBlocks(st.text)).replace(/\[\[/g, "\\[\\["), text, "", owner);
 			else text.setText(`${plural(s.units.length, "paragraph")}; no summary yet.`);
 			return;
 		}

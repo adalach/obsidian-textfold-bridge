@@ -200,6 +200,12 @@ function safeText(text: string, paper: string, citations: boolean): string {
 	return answerMarkdown(kept, paper, null).replace(/\[\[|\uE001/g, "\\[\\[").replace(/\r\n?/g, "\n").trim();
 }
 
+/** A line that starts like "2.1 Setup" escaped as "2\\.1 Setup", which reads the same: after a list Obsidian would
+ *  otherwise draw it, and the lines after it, inside the list's last item (a subsection's name in a dragged section). */
+export function keepOutOfLists(md: string): string {
+	return md.replace(/^(\s*\d+)\.(?=\d)/gm, "$1\\.");
+}
+
 const quoted = (s: string) => s.split("\n").map(l => (l.trim() ? `> ${l}` : ">"));
 
 /** The Markdown a drop inserts: a [!textfold] callout (the default), a quote, the link alone, or the text alone; all
@@ -267,7 +273,8 @@ function itemParts(item: DragItem): { md: string; written: boolean }[] {
 		if (item.comment) add(`**${own(item.comment)}**`);
 		add(safeText(item.text, item.paper, true), item.written);
 	} else {
-		add(safeText(item.text || item.quote || "", item.paper, item.written), item.written);
+		const text = safeText(item.text || item.quote || "", item.paper, item.written);
+		add(text.includes("\n") ? keepOutOfLists(text) : text, item.written);
 		add(own(item.comment));
 	}
 	return parts;

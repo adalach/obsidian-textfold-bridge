@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseDoc } from "../src/doc";
-import { DRAG_MIME, DragItem, formatItem, isItem, itemFromLink, itemLabel, itemSentence, jsonFromHtml, linkFromText, multiLine, parseDragJson, readTransfer, toDragJson } from "../src/drag";
+import { DRAG_MIME, DragItem, formatItem, isItem, itemFromLink, itemLabel, itemSentence, jsonFromHtml, linkFromText, keepOutOfLists, multiLine, parseDragJson, readTransfer, toDragJson } from "../src/drag";
 import { parseNotes } from "../src/notes";
 
 // what TextFold's reader sends when a paragraph is dragged at Key (the contract, with made-up text)
@@ -269,7 +269,7 @@ describe("drops of several paragraphs", () => {
 			"> - Thingi10K meshes decompose exactly",
 			"> - Queries run faster",
 			">",
-			"> 2.1 Setup",
+			"> 2\\.1 Setup",
 			"> Meshes and machines.",
 			"> - A laptop CPU [↗](textfold://open?paper=2602.07369&s=S2&level=takeaway)",
 		].join("\n"));
@@ -297,11 +297,15 @@ describe("drops of several paragraphs", () => {
 			"- Thingi10K meshes decompose exactly",
 			"- Queries run faster",
 			"",
-			"2.1 Setup",
+			"2\\.1 Setup",
 			"Meshes and machines.",
 			"- A laptop CPU [↗](textfold://open?paper=2602.07369&s=S2&level=takeaway)",
 		].join("\n"));
 		expect(formatItem(selection, "icon")).toBe("We collect meshes.\n\nQueries run faster. [↗](textfold://open?paper=2602.07369&u=S1.p5.1&to=S1.p6&level=full)");
+	});
+
+	it("keeps a numbered line after a list out of the list, reading the same", () => {
+		expect(keepOutOfLists("- a\n\n2.1 Setup\n3 Results\n  4.2 x")).toBe("- a\n\n2\\.1 Setup\n3 Results\n  4\\.2 x");
 	});
 
 	it("writes Full link as one titled link", () => {

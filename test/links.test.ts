@@ -142,3 +142,25 @@ describe("withId and withoutId", () => {
 		expect(withoutId("pdf-x", "md-a")).toBe("pdf-x");
 	});
 });
+
+describe("turns of a conversation (t=)", () => {
+	it("reads a turn only with a note, and only as a number of up to three digits", () => {
+		expect(parseLink("textfold://open?paper=2602.07369&n=n-chat1&t=2&lang=en")).toEqual({ paper: "2602.07369", n: "n-chat1", t: 2, lang: "en" });
+		expect(parseLink("textfold://open?paper=x1&n=n-1&t=0")).toEqual({ paper: "x1", n: "n-1", t: 0 });
+		expect(parseLink("textfold://open?paper=x1&t=2")).toEqual({ paper: "x1" });
+		expect(parseLink("textfold://open?paper=x1&n=n-1&t=1000")).toEqual({ paper: "x1", n: "n-1" });
+		expect(parseLink("textfold://open?paper=x1&n=n-1&t=-1")).toEqual({ paper: "x1", n: "n-1" });
+	});
+
+	it("writes it after the note, and leaves it out without one", () => {
+		expect(buildLink({ paper: "x1", n: "n-1", t: 3, lang: "en" })).toBe("textfold://open?paper=x1&n=n-1&t=3&lang=en");
+		expect(buildLink({ paper: "x1", u: "u6", t: 3 })).toBe("textfold://open?paper=x1&u=u6");
+		expect(parseLink(buildLink({ paper: "x1", n: "n-1", t: 0 }))).toEqual({ paper: "x1", n: "n-1", t: 0 });
+	});
+
+	it("puts it after the note in the reader's hash, as the reader reads it", () => {
+		expect(readerUrl("http://127.0.0.1:31917", { paper: "x1", n: "n-1", t: 2, lang: "en" })).toBe("http://127.0.0.1:31917/p/x1?lang=en#n=n-1&t=2");
+		expect(readerUrl("http://127.0.0.1:31917", { paper: "x1", u: "u6", t: 2 })).toBe("http://127.0.0.1:31917/p/x1#u=u6");
+	});
+});
+

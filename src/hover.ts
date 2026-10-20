@@ -7,7 +7,7 @@ import { Component, HoverParent, HoverPopover, Keymap, MarkdownRenderer, Plugin,
 import type { TextFoldClient } from "./client";
 import { DocIndex, sectionName, sectionSummary, unitText } from "./doc";
 import { Level, TextFoldLink, parseLink } from "./links";
-import { NotesFile, Paper, noteLine } from "./notes";
+import { NotesFile, Paper, citationLinks, noteLine } from "./notes";
 import { missingPaper } from "./opener";
 
 const WAIT_MS = 300;
@@ -105,9 +105,18 @@ export class LinkPreviews {
 			const note = nf?.notes.find(n => n.id === link.n);
 			const s = note && index?.sectionOf(note.unit, note.section);
 			if (s) head.push(sectionName(s));
+			const turnAt = link.t !== undefined && note?.kind === "ask" ? note.thread[link.t] : undefined;
+			if (turnAt) head.push(`turn ${(link.t ?? 0) + 1} of ${note!.thread.length}`);
 			meta.setText(head.join(" · "));
 			if (!note) {
 				body.createDiv({ cls: "tfb-hover-text", text: "This note is no longer in TextFold." });
+				return;
+			}
+			if (turnAt) { // one turn of the conversation: its question and its answer
+				body.createDiv({ cls: "tfb-card-q", text: turnAt.q });
+				const a = body.createDiv("tfb-hover-text markdown-rendered");
+				if (turnAt.a) await MarkdownRenderer.render(this.plugin.app, citationLinks(turnAt.a, link.paper), a, "", owner);
+				else a.setText(turnAt.pending ? "Answering…" : "No answer.");
 				return;
 			}
 			if (note.lost) lostLine(body);

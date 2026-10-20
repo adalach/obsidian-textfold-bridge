@@ -90,7 +90,7 @@ describe("by paper, with what TextFold says", () => {
 		],
 	});
 	const nf = parseNotes({ paper: { id: "2602.07369", title: "t" }, notes: [
-		{ id: "n-1", kind: "ask", anchor: { unit: "S1.p1.1", section: "S1", quote: { exact: "Intro." } }, text: "", thread: [{ q: "Why convex?", a: "Speed.", takeaway: "Speed." }] },
+		{ id: "n-1", kind: "ask", anchor: { unit: "S1.p1.1", section: "S1", quote: { exact: "Intro." } }, text: "", thread: [{ q: "Why convex?", a: "Speed.", takeaway: "Speed." }, { q: "And why greedy?", a: "Simplicity.", takeaway: "Simple." }] },
 	] }, "2602.07369");
 
 	it("tells what each citation cites", () => {
@@ -98,6 +98,10 @@ describe("by paper, with what TextFold says", () => {
 		expect(citedText(cites[2], doc, nf)).toBe("Greedy fitting of convex primitives");
 		expect(citedText(cites[3], doc, nf)).toBe("Why convex?");
 		expect(citedText(cites[0], null, null)).toBeNull();
+		const [turn] = findCitations("[a turn](textfold://open?paper=2602.07369&n=n-1&t=1)");
+		expect(citedText(turn, doc, nf)).toBe("And why greedy?");
+		const [gone] = findCitations("[a turn](textfold://open?paper=2602.07369&n=n-1&t=7)");
+		expect(citedText(gone, doc, nf)).toBe("Why convex?");
 	});
 
 	it("groups by paper in the order first cited, then by section in the paper's order", () => {

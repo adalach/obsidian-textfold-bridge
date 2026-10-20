@@ -136,10 +136,13 @@ export function itemFromLink(link: TextFoldLink, doc: Doc | null, nf: NotesFile 
 		// answer in one sentence, its comment the reader's question
 		if (note.quote) item.quote = note.quote;
 		if (note.kind === "ask") {
-			const said = [...note.thread].reverse().find(t => t.a);
-			item.text = said ? said.takeaway || said.a : "";
-			item.written = !!said;
-			if (note.thread[0]?.q) item.comment = note.thread[0].q;
+			// a link to one turn: that turn's answer, its question as the comment (as TextFold sends a message)
+			const turn = link.t !== undefined ? note.thread[link.t] : undefined;
+			const said = turn ?? [...note.thread].reverse().find(t => t.a);
+			item.text = said ? (turn ? said.a || said.q : said.takeaway || said.a) : "";
+			item.written = !!said?.a;
+			const q = turn ? turn.q : note.thread[0]?.q;
+			if (q && item.text !== q) item.comment = q;
 		} else {
 			item.text = note.text.trim() || note.quote || noteLine(note);
 			if (note.text.trim()) item.comment = note.text.trim();

@@ -9,7 +9,7 @@
 ## What it does
 
 - **`textfold://` links.** A link opens the paper in TextFold, at a paragraph, a note or a zoom level. Click it in Reading view, in Live Preview or in the sidebar.
-- **Hover previews.** Hover a link to see its paragraph (at the link's level, else Takeaway), its section's title and summary, its note, or the paper's title and authors. In Reading view a hover is enough; in the editor hold Cmd (Ctrl on Windows and Linux), as with Obsidian's page previews.
+- **Hover previews.** Hover a link to see its paragraph (at the link's level, else Takeaway), its section's title and summary, its note, one turn of a conversation (question and answer), or the paper's title and authors. In Reading view a hover is enough; in the editor hold Cmd (Ctrl on Windows and Linux), as with Obsidian's page previews.
 - **Drops from TextFold.** Drag a paragraph, a section's summary, a note, a conversation or a selection from TextFold's reader into any note, or copy and paste it: it goes in where you drop it, with its title, section and a link back.
 - **Insert link to a TextFold paper.** A command that searches TextFold's documents by title, id or citekey and inserts `[Title](textfold://open?paper=ID)` at the cursor. With text selected, the selection becomes the link's label.
 - **TextFold sidebar.** For the note you are in, two lists behind a switch at the top. **In this note**: every TextFold citation in the note, one line each with what it cites; a click goes to that place in the note. **In TextFold**: the TextFold documents the note refers to, each with its highlights, comments and Ask conversations under their sections; hover a line to read the whole note with the model's answer, open TextFold at it, copy or insert its link, or drag it into a note. Open the sidebar with the command **Open TextFold notes**.
@@ -29,7 +29,7 @@ The zoning step follows [Convex Partition Zoner](textfold://open?paper=pdf-357ae
 
 ## Citations in this note
 
-**In this note**, at the top of the sidebar, lists every `textfold://` link in the open note, in reading order: plain links, dropped callouts and quotes, and the ↗ icon links alike. A line shows what the link cites, as TextFold has it (the paragraph or section summary at the link's level, else Takeaway; a note's passage; an Ask's question), or else the link's own words, and on the right the paper's short title. Hover a line to preview it.
+**In this note**, at the top of the sidebar, lists every `textfold://` link in the open note, in reading order: plain links, dropped callouts and quotes, and the ↗ icon links alike. A line shows what the link cites, as TextFold has it (the paragraph or section summary at the link's level, else Takeaway; a note's passage; an Ask's question, the linked turn's for a link to one turn), or else the link's own words, and on the right the paper's short title. Hover a line to preview it.
 
 - **Click a line** to go to the link in the note: it scrolls into the middle and lights up for a moment, with the cursor on it in Live Preview and Source mode; in Reading view its line and the link light up.
 - **The TextFold icon** on a line (shown on hover) opens TextFold there, as a click on the link would.
@@ -93,11 +93,11 @@ Section names, paragraph previews and the cite labels in imported answers come f
 ## Links
 
 ```
-textfold://open?paper=<document id>[&s=<section id>][&u=<paragraph id>][&n=<note id>][&level=<full|brief|key|takeaway|topic>][&lang=<code>]
+textfold://open?paper=<document id>[&s=<section id>][&u=<paragraph id>][&n=<note id>[&t=<turn>]][&level=<full|brief|key|takeaway|topic>][&lang=<code>]
 ```
 
 - `paper`: the document's id in TextFold, as in its reader's address (`/p/<id>`).
-- `s`: a section; `u`: a paragraph; `n`: one of your notes; `level`: the zoom level; `lang`: the language to read it in.
+- `s`: a section; `u`: a paragraph; `n`: one of your notes; `t`: with `n`, one turn of its conversation (0 is the first question), which TextFold scrolls to in the chat or the note's window; `level`: the zoom level; `lang`: the language to read it in.
 
 Before it opens a link, the plugin asks the running TextFold whether it has the document. If it has not (a link to a paper in another TextFold library, or one deleted since), a notice names the paper and nothing opens, instead of TextFold's home screen. If TextFold is not running, a link in **TextFold app** mode opens anyway, which starts the app.
 

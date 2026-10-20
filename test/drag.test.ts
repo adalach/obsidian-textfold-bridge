@@ -161,6 +161,14 @@ describe("itemFromLink", () => {
 		expect(itemFromLink({ paper: "2602.07369", s: "S3", level: "topic" }, doc, null)).toMatchObject({ kind: "section", text: "greedy fitting", written: true });
 	});
 
+	it("fills a link to one turn with that turn's answer, its question as the comment", () => {
+		const chat = parseNotes({ paper: { id: "2602.07369", title: "t" }, notes: [
+			{ id: "n-chat", kind: "ask", anchor: { unit: null, section: null, on: "paper", quote: { exact: "" } }, text: "", thread: [{ q: "First?", a: "One.", takeaway: "1" }, { q: "Second?", a: "Two [[S3.p2]].", takeaway: "2" }] },
+		] }, "2602.07369");
+		expect(itemFromLink({ paper: "2602.07369", n: "n-chat", t: 1 }, doc, chat)).toMatchObject({ kind: "ask", text: "Two [[S3.p2]].", comment: "Second?", written: true, link: { t: 1 } });
+		expect(itemFromLink({ paper: "2602.07369", n: "n-chat" }, doc, chat)).toMatchObject({ kind: "ask", text: "2", comment: "First?" });
+	});
+
 	it("fills a note link with the passage and comment, an Ask with its question and answer", () => {
 		expect(itemFromLink({ paper: "2602.07369", n: "n-1" }, doc, nf)).toMatchObject({ kind: "note", text: "Why greedy?", quote: "fitted greedily", comment: "Why greedy?", written: false });
 		expect(itemFromLink({ paper: "2602.07369", n: "n-2" }, doc, nf)).toMatchObject({ kind: "ask", text: "Yes.", quote: "Each is convex.", comment: "Always?", written: true });
@@ -191,6 +199,36 @@ describe("text with a TextFold icon", () => {
 	it("keeps text as text, and names the document when nothing was dragged", () => {
 		expect(formatItem(of({ text: "See [[Other note]].", written: false }), "icon")).toBe("See \\[\\[Other note]]. [↗](textfold://open?paper=2602.07369&u=S3.p2&level=key)");
 		expect(formatItem(of({ text: "", section: null, kind: "paragraph" }), "icon")).toBe("Convex Primitive Decomposition [↗](textfold://open?paper=2602.07369&u=S3.p2&level=key)");
+	});
+});
+
+describe("messages of a conversation and Topic cards, as TextFold sends them", () => {
+	const chat = (o: Record<string, unknown>) => parseDragJson(JSON.stringify({ ...wire, section: null, kind: "ask", level: "key", ...o }))!;
+
+	it("keeps the turn in the link", () => {
+		expect(chat({ text: "Why convex?", written: false, link: "textfold://open?paper=2602.07369&n=n-chat&t=1&lang=en" }).link).toEqual({ paper: "2602.07369", n: "n-chat", t: 1, lang: "en" });
+	});
+
+	it("drops a question as the question, an answer under its question", () => {
+		const q = chat({ text: "Why convex?", written: false, link: "textfold://open?paper=2602.07369&n=n-chat&t=1&lang=en" });
+		expect(formatItem(q, "icon")).toBe("Why convex? [↗](textfold://open?paper=2602.07369&n=n-chat&t=1&lang=en)");
+		const a = chat({ text: "Speed (§1 ¶1) and simplicity (inference).", comment: "Why convex?", written: true, link: "textfold://open?paper=2602.07369&n=n-chat&t=1&lang=en" });
+		expect(formatItem(a, "callout")).toBe([
+			"> [!textfold|written] Convex Primitive Decomposition",
+			"> **Why convex?**",
+			">",
+			"> Speed (§1 ¶1) and simplicity (inference). [↗](textfold://open?paper=2602.07369&n=n-chat&t=1&lang=en)",
+		].join("\n"));
+	});
+
+	it("drops a Topic card as its topic and chips", () => {
+		const card = parseDragJson(JSON.stringify({ ...wire, kind: "section", level: "topic", text: "Greedy fitting\nconvex primitives · linear operators", written: true, link: "textfold://open?paper=2602.07369&s=S3&level=topic&lang=en" }))!;
+		expect(formatItem(card, "callout")).toBe([
+			"> [!textfold|written] Convex Primitive Decomposition › 3 Method",
+			"> Greedy fitting",
+			"> convex primitives · linear operators [↗](textfold://open?paper=2602.07369&s=S3&level=topic&lang=en)",
+		].join("\n"));
+		expect(itemSentence(card)).toBe("Greedy fitting convex primitives · linear operators");
 	});
 });
 

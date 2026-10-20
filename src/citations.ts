@@ -115,15 +115,15 @@ function plain(s: string): string {
 		.trim();
 }
 
-/** What a citation cites, from TextFold: a note's quote (an Ask's question), a paragraph or a section's summary at the
- *  link's level (else Takeaway); null when TextFold gave nothing for it. */
+/** What a citation cites, from TextFold: a note's quote (an Ask's question: the linked turn's, else the first), a
+ *  paragraph or a section's summary at the link's level (else Takeaway); null when TextFold gave nothing for it. */
 export function citedText(c: Citation, doc: Doc | null, nf: NotesFile | null): string | null {
 	const index = doc ? new DocIndex(doc) : null;
 	const level = c.link.level ?? "takeaway";
 	if (c.link.n) {
 		const note = nf?.notes.find(x => x.id === c.link.n);
 		if (!note) return null;
-		if (note.kind === "ask") return note.thread[0]?.q || note.quote || null;
+		if (note.kind === "ask") return (c.link.t !== undefined ? note.thread[c.link.t]?.q : undefined) || note.thread[0]?.q || note.quote || null;
 		return note.quote || note.text || null;
 	}
 	if (c.link.u) {

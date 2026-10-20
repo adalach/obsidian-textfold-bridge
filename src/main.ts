@@ -9,6 +9,7 @@ import { FoldRecord, Folds } from "./fold";
 import { LinkPreviews } from "./hover";
 import { ICON, ICON_SVG } from "./icon";
 import { installIconLinks } from "./iconLinks";
+import { flashField } from "./jump";
 import { ImportPicker, Importer } from "./importer";
 import { LinkOpener, listenDocuments } from "./opener";
 import { insertPaperLink } from "./picker";
@@ -40,6 +41,7 @@ export default class TextFoldBridgePlugin extends Plugin {
 		this.register(() => this.folds.stop());
 		new Drops(this, this.client, () => this.settings.dropAs).install();
 		installIconLinks(this);
+		this.registerEditorExtension(flashField);
 		this.importer = new Importer(this.app, this.client, () => ({ folder: this.settings.importFolder, byCitekey: this.settings.importNames === "citekey" }));
 
 		this.registerView(VIEW_TYPE, leaf => new TextFoldNotesView(leaf, this));
@@ -47,16 +49,19 @@ export default class TextFoldBridgePlugin extends Plugin {
 
 		this.addCommand({
 			id: "insert-paper-link",
+			icon: ICON,
 			name: "Insert link to a TextFold paper",
 			editorCallback: editor => void insertPaperLink(this.app, this.client, editor),
 		});
 		this.addCommand({
 			id: "open-notes-view",
+			icon: ICON,
 			name: "Open TextFold notes",
 			callback: () => void this.openView(),
 		});
 		this.addCommand({
 			id: "fold-note",
+			icon: ICON,
 			name: "Fold this note",
 			checkCallback: checking => {
 				const file = this.app.workspace.getActiveFile();
@@ -67,6 +72,7 @@ export default class TextFoldBridgePlugin extends Plugin {
 		});
 		this.addCommand({
 			id: "import-notes",
+			icon: ICON,
 			name: "Import notes from TextFold",
 			callback: () => void this.pickImport(),
 		});

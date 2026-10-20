@@ -73,24 +73,24 @@ describe("reading a transfer", () => {
 describe("formatItem", () => {
 	const item = parseDragJson(JSON.stringify({ ...wire, comment: "Check the proof." }))!;
 
-	it("makes a callout: title and section, text, comment, link; marked as the model's words", () => {
+	it("makes a callout: title and section, text, comment ending in the icon link; marked as the model's words", () => {
 		expect(formatItem(item, "callout")).toBe([
 			"> [!textfold|written] Convex Primitive Decomposition › 3 Method",
 			"> Primitives are fitted greedily. Each is convex.",
 			">",
-			"> Check the proof.",
-			">",
-			"> [Open in TextFold](textfold://open?paper=2602.07369&u=S3.p2&level=key)",
+			"> Check the proof. [↗](textfold://open?paper=2602.07369&u=S3.p2&level=key)",
 		].join("\n"));
 	});
 
 	it("makes a quote with the link, or the link alone", () => {
-		expect(formatItem({ ...item, comment: undefined, written: false }, "quote")).toBe([
+		expect(formatItem({ ...item, comment: undefined, written: false }, "quote")).toBe(
+			"> Primitives are fitted greedily. Each is convex. [↗](textfold://open?paper=2602.07369&u=S3.p2&level=key)",
+		);
+		expect(formatItem(item, "quote")).toBe([
 			"> Primitives are fitted greedily. Each is convex.",
 			">",
-			"> — [Convex Primitive Decomposition › 3 Method](textfold://open?paper=2602.07369&u=S3.p2&level=key)",
+			"> Check the proof. *(written by the model)* [↗](textfold://open?paper=2602.07369&u=S3.p2&level=key)",
 		].join("\n"));
-		expect(formatItem(item, "quote")).toContain("· *written by the model*");
 		expect(formatItem(item, "link")).toBe("[Convex Primitive Decomposition › 3 Method](textfold://open?paper=2602.07369&u=S3.p2&level=key)");
 	});
 
@@ -112,9 +112,7 @@ describe("formatItem", () => {
 			"> [!textfold] Convex Primitive Decomposition › 3 Method",
 			"> fitted greedily",
 			">",
-			"> Why greedy?",
-			">",
-			"> [Open in TextFold](textfold://open?paper=2602.07369&n=n-1&lang=en)",
+			"> Why greedy? [↗](textfold://open?paper=2602.07369&n=n-1&lang=en)",
 		].join("\n"));
 	});
 
@@ -126,13 +124,14 @@ describe("formatItem", () => {
 			">",
 			"> **Always?**",
 			">",
-			"> Yes, always ([S3.p2](textfold://open?paper=2602.07369&u=S3.p2)).",
+			"> Yes, always ([S3.p2](textfold://open?paper=2602.07369&u=S3.p2)). [↗](textfold://open?paper=2602.07369&n=n-2)",
 		]);
 	});
 
 	it("says what an item without text is", () => {
 		const bare: DragItem = { paper: "x1", title: "x1", authors: [], section: null, kind: "paper", text: "", written: true, link: { paper: "x1" } };
-		expect(formatItem(bare, "callout")).toBe("> [!textfold] x1\n>\n> [Open in TextFold](textfold://open?paper=x1)");
+		expect(formatItem(bare, "callout")).toBe("> [!textfold] x1 [↗](textfold://open?paper=x1)");
+		expect(formatItem(bare, "quote")).toBe("> x1 [↗](textfold://open?paper=x1)");
 		expect(itemLabel(bare)).toBe("x1");
 	});
 });

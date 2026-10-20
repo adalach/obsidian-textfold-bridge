@@ -79,22 +79,27 @@ export function notesBlock(nf: NotesFile, doc: Doc | null, source?: { label: str
 }
 
 function noteMarkdown(n: Note, paper: string, index: DocIndex | null): string[] {
-	const out: string[] = [];
+	const icon = `[↗](${buildLink(noteLink(paper, n))})`; // drawn as TextFold's icon: a link back to the note
+	const quoteLines: string[] = [];
 	const said = n.kind === "ask" ? n.thread.filter(t => t.a) : [];
 	if (said.length) { // the conversation as one callout: the first question its title, each later one in bold
-		out.push(...quote(`[!question] ${said[0].q}`));
-		if (n.quote) out.push(...quote(`*${n.quote}*`));
+		quoteLines.push(...quote(`[!question] ${said[0].q}`));
+		if (n.quote) quoteLines.push(...quote(`*${n.quote}*`));
 		said.forEach((t, k) => {
-			out.push(">");
-			if (k) out.push(...quote(`**${t.q}**`), ">");
-			out.push(...quote(answerMarkdown(t.a, paper, index)));
-			if (t.takeaway) out.push(">", ...quote(`→ ${t.takeaway}`));
+			quoteLines.push(">");
+			if (k) quoteLines.push(...quote(`**${t.q}**`), ">");
+			quoteLines.push(...quote(answerMarkdown(t.a, paper, index)));
+			if (t.takeaway) quoteLines.push(">", ...quote(`→ ${t.takeaway}`));
 		});
-	} else if (n.on !== "paper" && n.quote) out.push(...quote(n.quote)); // (a note on the whole paper quotes nothing)
-	out.push("", `^${n.id}`, "");
+	} else if (n.on !== "paper" && n.quote) quoteLines.push(...quote(n.quote)); // (a note on the whole paper quotes nothing)
+	const comment = n.text.trim();
+	// the link back ends the note's last line: its comment, else its passage or conversation
+	if (!comment && quoteLines.length) quoteLines[quoteLines.length - 1] += ` ${icon}`;
+	const out = [...quoteLines, "", `^${n.id}`, ""];
 	if (n.lost) out.push("*Passage not found after the edit.*", "");
-	if (n.text.trim()) out.push(n.text.trim(), "");
-	out.push(`[Open in TextFold](${buildLink(noteLink(paper, n))})`);
+	if (comment) out.push(`${comment} ${icon}`, "");
+	else if (!quoteLines.length) out.push(icon, "");
+	out.pop();
 	return out;
 }
 

@@ -1,14 +1,19 @@
-// The sidebar: for the active note, the TextFold documents it refers to (frontmatter `textfold:` and textfold://
-// links in its text), each with its highlights, comments and Ask conversations, one line each, under the names of the
-// sections they are in; hovering a line shows the whole note, and an answer is rendered with MarkdownRenderer. A note
-// folded in TextFold also shows how its fold stands (folding, folded, changed since, failed). Server text never goes in
-// as HTML.
+// The sidebar, for the active note, in two parts behind a switch:
+// - In this note: every textfold:// link in the note (its citations), one line each with what it cites, grouped by the
+//   note's headings or by paper and section; a click goes to the link in the note, a hover previews it.
+// - In TextFold: the TextFold documents the note refers to (frontmatter `textfold:` and its links), each with its
+//   highlights, comments and Ask conversations under their sections; hovering a line shows the whole note, an answer
+//   rendered with MarkdownRenderer. A note folded in TextFold also shows how its fold stands.
+// Server text never goes in as HTML.
 import { Component, ItemView, MarkdownRenderer, MarkdownView, Notice, TFile, WorkspaceLeaf, debounce, setIcon, setTooltip } from "obsidian";
+import { Citation, CitationGroup, HeadingPos, citedSection, citedText, findCitations, groupByHeading, groupByPaper } from "./citations";
 import { TextFoldError } from "./client";
 import { Doc, DocIndex, sectionName } from "./doc";
-import { itemFromLink, setTransfer } from "./drag";
+import { itemFromLink, setTransfer, shortTitle } from "./drag";
 import { FoldRecord, FoldState } from "./fold";
 import { lostLine } from "./hover";
+import { ICON } from "./icon";
+import { jumpTo } from "./jump";
 import { TextFoldLink, findPaperIds, markdownLink } from "./links";
 import { missingPaper } from "./opener";
 import type TextFoldBridgePlugin from "./main";
@@ -29,6 +34,9 @@ export class TextFoldNotesView extends ItemView {
 	private file: TFile | null = null;
 	private ids: string[] = [];
 	private items: Item[] = [];
+	private citations: Citation[] = [];
+	private headings: HeadingPos[] = [];
+	private switchesEl!: HTMLElement;
 	private reachable = false;
 	private fold: Fold | null = null;
 	private run = 0;
@@ -38,12 +46,13 @@ export class TextFoldNotesView extends ItemView {
 	private listEl!: HTMLElement;
 	private card: HoverCard | null = null;
 	// the note was edited: ask TextFold again only when its documents changed; a folded note may now differ from its fold
+	// (and its citations moved: the list follows without asking TextFold)
 	private onChanged = debounce((file: TFile) => {
 		if (file !== this.file) return;
 		void this.paperIds(file).then(ids => {
 			if (file !== this.file) return;
 			if (ids.join("\n") !== this.ids.join("\n")) void this.refresh(false);
-			else void this.updateFold();
+			else void this.scan(file).then(() => this.updateFold());
 		});
 	}, 800, true);
 
@@ -60,7 +69,7 @@ export class TextFoldNotesView extends ItemView {
 	}
 
 	getIcon(): string {
-		return "book-open-text";
+		return ICON;
 	}
 
 	async onOpen(): Promise<void> {
@@ -79,6 +88,8 @@ export class TextFoldNotesView extends ItemView {
 		});
 		button("download", "Import the notes of these documents into the vault", () => void this.importAll());
 		button("refresh-cw", "Refresh", () => void this.refresh(true));
+		this.switchesEl = root.createDiv("tfb-switches");
+		this.renderSwitches();
 		this.listEl = root.createDiv("tfb-list");
 		this.card = new HoverCard(this);
 		this.addChild(this.card);
@@ -119,12 +130,13 @@ export class TextFoldNotesView extends ItemView {
 			return;
 		}
 		const ids = await this.paperIds(file);
+		await this.scan(file);
 		if (run !== this.run) return;
 		this.ids = ids;
 		if (!ids.length) {
 			this.items = [];
 			this.fold = null;
-			this.showStatus("This note links to no TextFold document.", "Add textfold: <document id> to its properties, insert a link with \"Insert link to a TextFold paper\", or fold the note with the layers button.");
+			this.showStatus("This note links to no TextFold document.", "Add textfold: <document id> to its properties, insert a link with \"Insert link to a TextFold paper\", drop something from TextFold, or fold the note with the layers button.");
 			this.listEl.empty();
 			return;
 		}
@@ -153,13 +165,36 @@ export class TextFoldNotesView extends ItemView {
 		this.items = this.reachable ? items : ids.map(id => ({ id, file: null, doc: null }));
 		await this.updateFold(false);
 		if (run !== this.run) return;
-		const state = client.state;
-		if (!this.reachable) this.showStatus(`TextFold is not reachable at ${state?.url ?? r.url}.`, describeConnection(state));
-		else {
-			const count = items.reduce((n, d) => n + (d.file?.notes.length ?? 0), 0);
-			this.showStatus(`${plural(ids.length, "document")} · ${plural(count, "note")}`, describeConnection(state));
-		}
 		this.render();
+	}
+
+	/** The note's citations and headings, from its text and the metadata cache (no request). */
+	private async scan(file: TFile): Promise<void> {
+		const text = await this.app.vault.cachedRead(file);
+		this.citations = findCitations(text);
+		this.headings = (this.app.metadataCache.getFileCache(file)?.headings ?? []).map(h => ({ heading: h.heading, level: h.level, offset: h.position.start.offset }));
+	}
+
+	/** One line under the buttons: "In this note · In TextFold", and for the citations "By heading · By paper". */
+	private renderSwitches(): void {
+		const el = this.switchesEl;
+		el.empty();
+		const s = this.plugin.settings;
+		const choice = (box: HTMLElement, options: [string, string, string][], current: string, set: (v: string) => void) => {
+			const group = box.createDiv("tfb-switch");
+			for (const [value, label, tip] of options) {
+				const b = group.createDiv({ cls: `tfb-switch-option${value === current ? " is-active" : ""}`, text: label, attr: { "aria-label": tip } });
+				b.addEventListener("click", () => {
+					if (value === current) return;
+					set(value);
+					void this.plugin.saveSettings();
+					this.renderSwitches();
+					this.render();
+				});
+			}
+		};
+		choice(el, [["note", "In this note", "The TextFold citations in this note"], ["textfold", "In TextFold", "The notes in TextFold on the documents this note cites"]], s.sidebarTab, v => (s.sidebarTab = v === "textfold" ? "textfold" : "note"));
+		if (s.sidebarTab === "note") choice(el, [["heading", "By heading", "Grouped by this note's headings"], ["paper", "By paper", "Grouped by paper and section"]], s.citationsGroup, v => (s.citationsGroup = v === "paper" ? "paper" : "heading"));
 	}
 
 	/** How this note's fold stands, from what is known (no request but the note's own text). */
@@ -182,8 +217,95 @@ export class TextFoldNotesView extends ItemView {
 
 	private render(): void {
 		this.card?.hide();
+		this.listEl.empty();
+		const state = this.plugin.client.state;
+		if (this.plugin.settings.sidebarTab === "note") {
+			if (!this.ids.length && !this.citations.length) return;
+			const papers = new Set(this.citations.map(c => c.link.paper)).size;
+			const where = this.reachable ? describeConnection(state) : `TextFold is not reachable at ${state?.url ?? "its address"}: titles and texts are the note's own.`;
+			this.showStatus(this.citations.length ? `${plural(this.citations.length, "citation")} · ${plural(papers, "paper")}` : "No textfold:// links in this note.", where);
+			this.renderCitations();
+			return;
+		}
+		if (!this.ids.length) return;
+		if (!this.reachable) this.showStatus(`TextFold is not reachable at ${state?.url ?? "its address"}.`, describeConnection(state));
+		else {
+			const count = this.items.reduce((n, d) => n + (d.file?.notes.length ?? 0), 0);
+			this.showStatus(`${plural(this.ids.length, "document")} · ${plural(count, "note")}`, describeConnection(state));
+		}
+		this.renderDocs();
+	}
+
+	/** In this note: the citations, grouped by heading or by paper; each goes to its place in the note on a click. */
+	private renderCitations(): void {
 		const list = this.listEl;
-		list.empty();
+		const item = (id: string) => this.items.find(i => i.id === id);
+		const byPaper = this.plugin.settings.citationsGroup === "paper";
+		const headingOf = (c: Citation) => {
+			let h = "";
+			for (const x of this.headings) if (x.offset <= c.from) h = x.heading;
+			return h || this.file?.basename || "";
+		};
+		const groups: CitationGroup<Citation>[] = byPaper
+			? groupByPaper(this.citations, c => {
+				const it = item(c.link.paper);
+				return { title: it?.doc?.title || it?.file?.paper.title || c.link.paper, section: citedSection(c, it?.doc ?? null, it?.file ?? null) };
+			})
+			: groupByHeading(this.citations, this.headings, this.file?.basename ?? "");
+		for (const g of groups) {
+			const key = `${byPaper ? "p" : "h"}:${g.key}`;
+			const open = !this.collapsed.has(key);
+			const head = list.createDiv({ cls: "tfb-row tfb-group" });
+			if (!byPaper && g.level > 1) head.setCssProps({ "--tfb-indent": `${Math.min(g.level - 1, 4) * 8}px` });
+			setIcon(head.createDiv("tfb-chevron"), open ? "chevron-down" : "chevron-right");
+			head.createDiv({ cls: "tfb-text", text: byPaper ? shortTitle(g.name) : g.name });
+			head.createDiv({ cls: "tfb-count", text: String(g.items.length) });
+			setTooltip(head, byPaper ? `${g.name}\n${g.key}` : g.name, { placement: "left" });
+			head.addEventListener("click", () => {
+				if (open) this.collapsed.add(key);
+				else this.collapsed.delete(key);
+				this.render();
+			});
+			if (!open) continue;
+			if (byPaper && g.sub) {
+				for (const s of g.sub) {
+					if (s.name && (g.sub.length > 1 || s.name !== "")) list.createDiv({ cls: "tfb-section", text: s.name });
+					for (const c of s.items) this.citationRow(list, c, headingOf(c));
+				}
+			} else for (const c of g.items) this.citationRow(list, c, shortTitle(item(c.link.paper)?.doc?.title || item(c.link.paper)?.file?.paper.title || c.link.paper));
+		}
+	}
+
+	/** One citation: what it cites, and on the right the paper (or, by paper, the note's heading it is under). */
+	private citationRow(list: HTMLElement, c: Citation, meta: string): void {
+		const it = this.items.find(i => i.id === c.link.paper);
+		const nf = it?.file ?? null;
+		const text = citedText(c, it?.doc ?? null, nf) || c.label || c.href;
+		const note = c.link.n ? nf?.notes.find(n => n.id === c.link.n) : undefined;
+		const icon = note ? KIND_ICON[note.kind] : c.link.n ? "sticky-note" : c.link.u ? "pilcrow" : c.link.s ? "heading" : "file-text";
+		const row = list.createDiv({ cls: "tfb-row tfb-item tfb-cite" });
+		setIcon(row.createDiv("tfb-kind"), icon);
+		row.createDiv({ cls: "tfb-text", text: text.replace(/\s+/g, " ") });
+		if (meta) row.createDiv({ cls: "tfb-meta", text: meta });
+		const missing = this.reachable && !!it && !it.file;
+		if (missing) row.addClass("tfb-muted");
+		const box = row.createDiv("tfb-actions");
+		const open = box.createDiv({ cls: "clickable-icon tfb-icon", attr: { "aria-label": missing ? missingPaper(c.link.paper) : "Open in TextFold" } });
+		setIcon(open, ICON);
+		open.addEventListener("click", e => {
+			e.stopPropagation();
+			void this.plugin.opener.open(c.link);
+		});
+		const nth = this.citations.filter(x => x.href === c.href && x.index < c.index).length;
+		row.addEventListener("click", () => {
+			if (this.file) void jumpTo(this.app, this.file, c.from, c.to, c.line, c.href, nth);
+		});
+		this.plugin.previews.attach(row, c.link);
+	}
+
+	/** In TextFold: the documents and their notes. */
+	private renderDocs(): void {
+		const list = this.listEl;
 		const reachable = this.reachable;
 		for (const item of this.items) {
 			const title = item.doc?.title || item.file?.paper.title || item.id;
@@ -301,8 +423,8 @@ export class TextFoldNotesView extends ItemView {
 				fn();
 			});
 		};
-		if (missing) add("external-link", missing, () => new Notice(missing, 8000));
-		else add("external-link", "Open in TextFold", () => void this.plugin.opener.open(link));
+		if (missing) add(ICON, missing, () => new Notice(missing, 8000));
+		else add(ICON, "Open in TextFold", () => void this.plugin.opener.open(link));
 		add("copy", "Copy link", () => void this.copy(markdownLink(label, link)));
 		add("text-cursor-input", "Insert link at the cursor", () => this.insert(markdownLink(truncate(label, 80), link)));
 		if (importId) add("download", "Import its notes into the vault", () => void this.plugin.importer.importPapers([importId]));

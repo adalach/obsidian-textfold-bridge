@@ -28,6 +28,13 @@ export class LinkPreviews {
 		this.plugin.registerEditorExtension(EditorView.domEventHandlers({ mouseover: (e, view) => this.onEditorHover(e, view) }));
 	}
 
+	/** Preview this link while the pointer is on an element of the plugin's own (a row of the sidebar's citations). */
+	attach(el: HTMLElement, link: TextFoldLink): void {
+		el.addEventListener("mouseenter", () => {
+			if (this.enabled()) this.show(el, link);
+		});
+	}
+
 	/** Forget cached notes and titles (refresh, a refold). */
 	forget(): void {
 		this.notes.clear();

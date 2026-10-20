@@ -87,9 +87,15 @@ describe("notesBlock", () => {
 		expect(lines.slice(2, 7)).toEqual(["# Zoning: a short note", "", "Agata Dalach · zoning.md", "", "[Open in TextFold](textfold://open?paper=md-zoning-1234abcd)"]);
 	});
 
-	it("writes a highlight as a quote with its block id, comment and link back", () => {
+	it("writes a highlight as a quote with its block id, then the comment ending in the link back", () => {
 		const at = lines.indexOf("> We merge.");
-		expect(lines.slice(at, at + 7)).toEqual(["> We merge.", "", "^n-late", "", "Check this.", "", "[Open in TextFold](textfold://open?paper=md-zoning-1234abcd&u=p-cccc3333&n=n-late)"]);
+		expect(lines.slice(at, at + 5)).toEqual(["> We merge.", "", "^n-late", "", "Check this. [↗](textfold://open?paper=md-zoning-1234abcd&u=p-cccc3333&n=n-late)"]);
+	});
+
+	it("ends a highlight without a comment with the link back on its passage", () => {
+		const at = lines.indexOf("> We partition. [↗](textfold://open?paper=md-zoning-1234abcd&u=p-bbbb2222&n=n-early)");
+		expect(lines.slice(at, at + 3)).toEqual(["> We partition. [↗](textfold://open?paper=md-zoning-1234abcd&u=p-bbbb2222&n=n-early)", "", "^n-early"]);
+		expect(block).not.toContain("[Open in TextFold](textfold://open?paper=md-zoning-1234abcd&");
 	});
 
 	it("writes a conversation as a question callout, citations as links", () => {
@@ -101,7 +107,7 @@ describe("notesBlock", () => {
 			">",
 			"> - one",
 			">",
-			"> → For speed.",
+			"> → For speed. [↗](textfold://open?paper=md-zoning-1234abcd&n=n-ask)",
 			"",
 			"^n-ask",
 		]);

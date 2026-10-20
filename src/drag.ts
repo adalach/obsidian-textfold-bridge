@@ -185,14 +185,15 @@ function safeText(text: string, paper: string, citations: boolean): string {
 
 const quoted = (s: string) => s.split("\n").map(l => (l.trim() ? `> ${l}` : ">"));
 
-/** The Markdown a drop inserts: a [!textfold] callout (the default), a quote with the link, the link alone, or the
- *  text followed by a ↗ link (drawn as TextFold's icon). A model's words are marked: the callout as
- *  `[!textfold|written]`, a quote with a line that says so. */
+/** The Markdown a drop inserts: a [!textfold] callout (the default), a quote, the link alone, or the text alone; all
+ *  but the link end in a ↗ link back, drawn as TextFold's icon. A model's words are marked: the callout as
+ *  `[!textfold|written]`, a quote with a few words before its icon. */
 export function formatItem(item: DragItem, mode: DropMode): string {
 	const link = buildLink(item.link);
 	const label = itemLabel(item).replace(/([[\]])/g, "\\$1") || item.paper;
+	const icon = `[${ICON_LABEL}](${link})`;
 	if (mode === "link") return `[${label}](${link})`;
-	if (mode === "icon") return `${itemSentence(item) || label} [${ICON_LABEL}](${link})`;
+	if (mode === "icon") return `${itemSentence(item) || label} ${icon}`;
 	const parts = itemParts(item);
 	const written = item.written && parts.some(p => p.written);
 	const body: string[] = [];
@@ -201,13 +202,14 @@ export function formatItem(item: DragItem, mode: DropMode): string {
 		body.push(...quoted(p.md));
 	}
 	if (mode === "quote") {
-		if (body.length) body.push(">");
-		body.push(`> — [${label}](${link})${written ? " · *written by the model*" : ""}`);
+		if (!body.length) body.push(`> ${label}`);
+		body[body.length - 1] += `${written ? " *(written by the model)*" : ""} ${icon}`;
 		return body.join("\n");
 	}
-	const out = [`> [!textfold${written ? "|written" : ""}] ${itemLabel(item) || item.paper}`, ...body];
-	out.push(">", `> [Open in TextFold](${link})`);
-	return out.join("\n");
+	const head = `> [!textfold${written ? "|written" : ""}] ${itemLabel(item) || item.paper}`;
+	if (!body.length) return `${head} ${icon}`;
+	body[body.length - 1] += ` ${icon}`;
+	return [head, ...body].join("\n");
 }
 
 /** What was dragged as it reads, on one line: a paragraph, summary, section, selection or chip as shown; a note's

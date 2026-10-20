@@ -15,6 +15,8 @@ export interface BridgeSettings {
 	foldLang: string; // the language "Fold this note" folds in
 	importFolder: string;
 	importNames: "title" | "citekey";
+	sidebarTab: "note" | "textfold"; // the sidebar shows the note's citations, or the documents' notes in TextFold
+	citationsGroup: "heading" | "paper";
 }
 
 export const DEFAULT_SETTINGS: BridgeSettings = {
@@ -27,6 +29,8 @@ export const DEFAULT_SETTINGS: BridgeSettings = {
 	foldLang: "en",
 	importFolder: "TextFold",
 	importNames: "title",
+	sidebarTab: "note",
+	citationsGroup: "heading",
 };
 
 const LANG = /^[a-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$/;

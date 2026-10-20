@@ -31,6 +31,67 @@
 	padding: 2px 0;
 }
 
+/* "In this note · In TextFold" and "By heading · By paper": small text switches on one line */
+.tfb-switches {
+	display: flex;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 2px 8px;
+	border-bottom: 1px solid var(--background-modifier-border);
+	font-size: var(--font-ui-smaller);
+}
+
+.tfb-switch {
+	display: flex;
+	gap: 2px;
+}
+
+.tfb-switch-option {
+	padding: 0 5px;
+	border-radius: var(--radius-s);
+	color: var(--text-muted);
+	cursor: pointer;
+}
+
+.tfb-switch-option:hover {
+	background-color: var(--background-modifier-hover);
+}
+
+.tfb-switch-option.is-active {
+	color: var(--text-normal);
+	background-color: var(--background-modifier-active-hover);
+}
+
+/* a group of citations: a heading of the note (indented by its level) or a paper */
+.tfb-group {
+	padding-left: calc(8px + var(--tfb-indent, 0px));
+}
+
+.tfb-group .tfb-text {
+	font-weight: var(--font-semibold);
+}
+
+.tfb-meta {
+	flex: none;
+	max-width: 38%;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+}
+
+.tfb-row:hover .tfb-meta {
+	display: none;
+}
+
+/* a citation gone to in the note, lit up for a moment */
+.tfb-flash {
+	background-color: var(--text-highlight-bg);
+	border-radius: var(--radius-s);
+	transition: background-color 0.4s;
+}
+
 .tfb-row {
 	display: flex;
 	align-items: center;

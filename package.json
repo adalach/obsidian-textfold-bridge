@@ -1,0 +1,31 @@
+{
+  "name": "textfold-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Links from Obsidian notes to papers and notes in TextFold, the local reader that folds a paper into five zoom levels.",
+  "author": "Agata Dalach",
+  "license": "MIT",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc --noEmit && node esbuild.config.mjs --prod",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "version": "node version-bump.mjs && git add manifest.json versions.json"
+  },
+  "devDependencies": {
+    "@codemirror/state": "6.5.2",
+    "@codemirror/view": "6.38.1",
+    "@eslint/js": "9.39.5",
+    "@eslint/json": "0.14.0",
+    "@types/node": "22.15.3",
+    "esbuild": "0.25.5",
+    "eslint": "9.39.5",
+    "eslint-plugin-obsidianmd": "0.4.2",
+    "globals": "14.0.0",
+    "obsidian": "1.13.1",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.71.2",
+    "vitest": "3.2.4"
+  }
+}

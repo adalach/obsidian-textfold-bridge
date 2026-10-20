@@ -1,0 +1,10 @@
+{
+  "id": "textfold-bridge",
+  "name": "TextFold Bridge",
+  "version": "0.1.0",
+  "minAppVersion": "1.13.0",
+  "description": "Link notes to papers in TextFold, the local reader with five zoom levels, and see your TextFold highlights, comments and questions beside the note.",
+  "author": "Agata Dalach",
+  "authorUrl": "https://github.com/adalach",
+  "isDesktopOnly": true
+}

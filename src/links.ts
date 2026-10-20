@@ -1,0 +1,100 @@
+// textfold:// links: parse and build them, map them to TextFold's reader URL, and find the documents a note refers to.
+// Pure functions without runtime imports from obsidian, so test/links.test.ts can run them in Node.
+//
+//   textfold://open?paper=<document id>[&u=<paragraph id>][&n=<note id>][&level=<full|brief|key|takeaway|topic>][&lang=<code>]
+//   -> <server>/p/<id>?lang=<code>#n=<note id>&u=<paragraph id>&level=<name>
+
+export const LEVELS = ["full", "brief", "key", "takeaway", "topic"] as const;
+export type Level = (typeof LEVELS)[number];
+
+/** A note's anchor.level as TextFold stores it (4 Full … 0 Topic), as a level name. */
+export function levelName(n: unknown): Level | undefined {
+	return typeof n === "number" && Number.isInteger(n) && n >= 0 && n <= 4 ? LEVELS[4 - n] : undefined;
+}
+
+export interface TextFoldLink {
+	paper: string;
+	u?: string; // paragraph (unit) id, such as S2.SS3.p2
+	n?: string; // note id, such as n-k3f9a2qx
+	level?: Level;
+	lang?: string;
+}
+
+// TextFold's document ids: arXiv ids, md-…, pdf-…, zotero-…, pmc…, wiki-…; its routes accept [\w.-]+
+const PAPER_ID = /^[\w.-]{1,120}$/;
+const NOTE_ID = /^[\w-]{1,80}$/;
+const LANG = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8})*$/;
+
+export function isPaperId(id: string): boolean {
+	return PAPER_ID.test(id);
+}
+
+/** A textfold:// link's parts, or null when it is not one (or names no valid document). Unknown or invalid
+ *  optional parts are dropped, so a link written by a newer TextFold still opens its document. */
+export function parseLink(href: string): TextFoldLink | null {
+	const m = /^textfold:\/\/open\/?(?:\?([^#]*))?(?:#.*)?$/i.exec(href.trim());
+	if (!m) return null;
+	const q = new URLSearchParams(m[1] ?? "");
+	const paper = q.get("paper") ?? "";
+	if (!isPaperId(paper)) return null;
+	const link: TextFoldLink = { paper };
+	const u = q.get("u");
+	if (u && u.length <= 200 && !/[\s#&]/.test(u)) link.u = u;
+	const n = q.get("n");
+	if (n && NOTE_ID.test(n)) link.n = n;
+	const level = q.get("level")?.toLowerCase();
+	if (level && (LEVELS as readonly string[]).includes(level)) link.level = level as Level;
+	const lang = q.get("lang");
+	if (lang && LANG.test(lang)) link.lang = lang;
+	return link;
+}
+
+/** The textfold:// link for a document, a paragraph or a note in it. */
+export function buildLink(link: TextFoldLink): string {
+	const parts = [`paper=${encodeURIComponent(link.paper)}`];
+	if (link.u) parts.push(`u=${encodeURIComponent(link.u)}`);
+	if (link.n) parts.push(`n=${encodeURIComponent(link.n)}`);
+	if (link.level) parts.push(`level=${link.level}`);
+	if (link.lang) parts.push(`lang=${encodeURIComponent(link.lang)}`);
+	return `textfold://open?${parts.join("&")}`;
+}
+
+/** The reader URL on a running TextFold server (base such as http://127.0.0.1:3017). The reader reads #n=, #u= and
+ *  #level= each on its own; with both a note and a paragraph, the paragraph is where it goes when the note is gone. */
+export function readerUrl(base: string, link: TextFoldLink): string {
+	let url = `${base.replace(/\/+$/, "")}/p/${encodeURIComponent(link.paper)}`;
+	if (link.lang) url += `?lang=${encodeURIComponent(link.lang)}`;
+	const hash: string[] = [];
+	if (link.n) hash.push(`n=${encodeURIComponent(link.n)}`);
+	if (link.u) hash.push(`u=${encodeURIComponent(link.u)}`);
+	if (link.level) hash.push(`level=${link.level}`);
+	return hash.length ? `${url}#${hash.join("&")}` : url;
+}
+
+/** A Markdown link with this label, its brackets escaped so the label cannot end the link early. */
+export function markdownLink(label: string, link: TextFoldLink): string {
+	const text = label.replace(/\s+/g, " ").trim().replace(/([[\]\\])/g, "\\$1") || link.paper;
+	return `[${text}](${buildLink(link)})`;
+}
+
+// a textfold:// link in running text ends at whitespace, or at a character that closes Markdown or HTML around it
+const LINK_IN_TEXT = /textfold:\/\/open\/?\?[^\s)\]>"'`<]+/gi;
+
+/** The documents a note refers to, in order of first mention: `textfold:` in its frontmatter (an id, a link, or a
+ *  list of them) first, then every textfold:// link in its text. */
+export function findPaperIds(text: string, frontmatterValue?: unknown): string[] {
+	const ids: string[] = [];
+	const add = (id: string | undefined) => {
+		if (id && isPaperId(id) && !ids.includes(id)) ids.push(id);
+	};
+	const fromValue = (v: unknown) => {
+		if (typeof v === "number") v = String(v); // an arXiv id typed without quotes is a YAML number
+		if (typeof v !== "string") return;
+		const s = v.trim();
+		add(s.toLowerCase().startsWith("textfold:") ? parseLink(s)?.paper : s);
+	};
+	if (Array.isArray(frontmatterValue)) frontmatterValue.forEach(fromValue);
+	else fromValue(frontmatterValue);
+	for (const m of text.matchAll(LINK_IN_TEXT)) add(parseLink(m[0].replace(/[.,;:!?]+$/, ""))?.paper);
+	return ids;
+}

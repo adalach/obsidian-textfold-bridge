@@ -3,7 +3,7 @@
 // a CodeMirror decoration that shows the Markdown again while the cursor is in the link. The icon is an
 // <a href="textfold://…">, so the plugin's click handler opens it (with the missing-paper check) and its hover handler
 // previews it. Without the plugin the Markdown still reads as text with a ↗ link.
-import { RangeSetBuilder } from "@codemirror/state";
+import { Prec, RangeSetBuilder } from "@codemirror/state";
 import { Decoration, DecorationSet, EditorView, ViewPlugin, ViewUpdate, WidgetType } from "@codemirror/view";
 import { Plugin, editorLivePreviewField, setIcon } from "obsidian";
 import { ICON_LABEL } from "./drag";
@@ -26,7 +26,8 @@ export function installIconLinks(plugin: Plugin): void {
 			if (a.textContent === ICON_LABEL && parseLink(a.getAttribute("href") ?? "")) asIcon(a);
 		});
 	});
-	plugin.registerEditorExtension(iconLinkPlugin);
+	// above Live Preview's own link rendering, which would otherwise draw the link over the icon
+	plugin.registerEditorExtension(Prec.highest(iconLinkPlugin));
 }
 
 class IconWidget extends WidgetType {

@@ -280,6 +280,7 @@
 
 .callout[data-callout="textfold"][data-callout-metadata~="written"] .callout-title-inner::after {
 	content: " · written by the model";
+	white-space: nowrap;
 	color: var(--text-faint);
 	font-size: var(--font-ui-smaller);
 	font-weight: var(--font-normal);

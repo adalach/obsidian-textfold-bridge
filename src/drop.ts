@@ -54,11 +54,11 @@ export class Drops {
 	}
 }
 
-/** The editor position under a drop's pointer (CodeMirror's posAtCoords), or null. */
+/** The editor position nearest a drop's pointer (CodeMirror's posAtCoords, not only over text: a drop beside a short
+ *  or empty line goes to that line), or null without CodeMirror. */
 function dropPosition(editor: Editor, evt: DragEvent): EditorPosition | null {
 	const cm = (editor as unknown as { cm?: EditorView }).cm;
-	const offset = cm?.posAtCoords({ x: evt.clientX, y: evt.clientY });
-	return offset === null || offset === undefined ? null : editor.offsetToPos(offset);
+	return cm ? editor.offsetToPos(cm.posAtCoords({ x: evt.clientX, y: evt.clientY }, false)) : null;
 }
 
 /** A link among words, with a space on either side where it would touch one. */

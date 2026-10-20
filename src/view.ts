@@ -1,11 +1,17 @@
 // The sidebar: for the active note, the TextFold documents it refers to (frontmatter `textfold:` and textfold://
-// links in its text), each with its highlights, comments and Ask conversations, one line each; hovering a line shows
-// the whole note, and an answer is rendered with MarkdownRenderer. Server text never goes in as HTML.
+// links in its text), each with its highlights, comments and Ask conversations, one line each, under the names of the
+// sections they are in; hovering a line shows the whole note, and an answer is rendered with MarkdownRenderer. A note
+// folded in TextFold also shows how its fold stands (folding, folded, changed since, failed). Server text never goes in
+// as HTML.
 import { Component, ItemView, MarkdownRenderer, MarkdownView, Notice, TFile, WorkspaceLeaf, debounce, setIcon, setTooltip } from "obsidian";
 import { TextFoldError } from "./client";
+import { Doc, DocIndex, sectionName } from "./doc";
+import { FoldRecord, FoldState } from "./fold";
+import { lostLine } from "./hover";
 import { TextFoldLink, findPaperIds, markdownLink } from "./links";
 import type TextFoldBridgePlugin from "./main";
 import { Note, NotesFile, citationLinks, noteLine, noteLink } from "./notes";
+import { WHOLE, groupNotes } from "./notesMarkdown";
 import { describeConnection } from "./settings";
 
 export const VIEW_TYPE = "textfold-notes";
@@ -14,22 +20,28 @@ const KIND_ICON = { highlight: "highlighter", note: "sticky-note", ask: "message
 const KIND_NAME = { highlight: "Highlight", note: "Note", ask: "Ask" } as const;
 const LEVEL_NAME = { full: "Full", brief: "Brief", key: "Key", takeaway: "Takeaway", topic: "Topic" } as const;
 
-type Doc = { id: string; file: NotesFile | null; error?: string };
+type Item = { id: string; file: NotesFile | null; doc: Doc | null; error?: string };
+type Fold = { rec: FoldRecord; state: FoldState };
 
 export class TextFoldNotesView extends ItemView {
 	private file: TFile | null = null;
 	private ids: string[] = [];
+	private items: Item[] = [];
+	private reachable = false;
+	private fold: Fold | null = null;
 	private run = 0;
 	private lastRefresh = 0;
 	private collapsed = new Set<string>();
 	private statusEl!: HTMLElement;
 	private listEl!: HTMLElement;
 	private card: HoverCard | null = null;
-	// the note was edited: ask TextFold again only when its documents changed
+	// the note was edited: ask TextFold again only when its documents changed; a folded note may now differ from its fold
 	private onChanged = debounce((file: TFile) => {
 		if (file !== this.file) return;
 		void this.paperIds(file).then(ids => {
-			if (file === this.file && ids.join("\n") !== this.ids.join("\n")) void this.refresh(false);
+			if (file !== this.file) return;
+			if (ids.join("\n") !== this.ids.join("\n")) void this.refresh(false);
+			else void this.updateFold();
 		});
 	}, 800, true);
 
@@ -55,9 +67,16 @@ export class TextFoldNotesView extends ItemView {
 		root.addClass("tfb-view");
 		const bar = root.createDiv("tfb-bar");
 		this.statusEl = bar.createDiv("tfb-status");
-		const refresh = bar.createDiv({ cls: "clickable-icon tfb-icon", attr: { "aria-label": "Refresh" } });
-		setIcon(refresh, "refresh-cw");
-		refresh.addEventListener("click", () => void this.refresh(true));
+		const button = (icon: string, tip: string, fn: () => void) => {
+			const b = bar.createDiv({ cls: "clickable-icon tfb-icon", attr: { "aria-label": tip } });
+			setIcon(b, icon);
+			b.addEventListener("click", fn);
+		};
+		button("layers", "Fold this note in TextFold", () => {
+			if (this.file) void this.plugin.folds.fold(this.file);
+		});
+		button("download", "Import the notes of these documents into the vault", () => void this.importAll());
+		button("refresh-cw", "Refresh", () => void this.refresh(true));
 		this.listEl = root.createDiv("tfb-list");
 		this.card = new HoverCard(this);
 		this.addChild(this.card);
@@ -68,6 +87,12 @@ export class TextFoldNotesView extends ItemView {
 		this.registerDomEvent(window, "focus", () => {
 			if (Date.now() - this.lastRefresh > 3000 && this.containerEl.isShown()) void this.refresh(false);
 		});
+		this.register(this.plugin.folds.onChange(() => {
+			const was = this.fold?.state.kind === "folding";
+			void this.updateFold().then(() => {
+				if (was && this.fold?.state.kind !== "folding") void this.refresh(false); // a fold ended: new levels, notes found again
+			});
+		}));
 		this.register(() => this.onChanged.cancel());
 		await this.refresh(true);
 	}
@@ -85,6 +110,8 @@ export class TextFoldNotesView extends ItemView {
 		this.file = file;
 		if (!file || file.extension !== "md") {
 			this.ids = [];
+			this.items = [];
+			this.fold = null;
 			this.showStatus(file ? "Open a Markdown note to see its TextFold documents." : "No note is open.");
 			this.listEl.empty();
 			return;
@@ -93,34 +120,52 @@ export class TextFoldNotesView extends ItemView {
 		if (run !== this.run) return;
 		this.ids = ids;
 		if (!ids.length) {
-			this.showStatus("This note links to no TextFold document.", "Add textfold: <document id> to its properties, or insert a link with the command \"Insert link to a TextFold paper\".");
+			this.items = [];
+			this.fold = null;
+			this.showStatus("This note links to no TextFold document.", "Add textfold: <document id> to its properties, insert a link with \"Insert link to a TextFold paper\", or fold the note with the layers button.");
 			this.listEl.empty();
 			return;
 		}
 		this.showStatus("Loading…");
+		if (recheck) this.plugin.previews.forget();
 		const client = this.plugin.client;
 		const r = recheck ? await client.check() : await client.server();
 		if (run !== this.run) return;
-		const docs: Doc[] = [];
+		const items: Item[] = [];
 		if (r.reachable) {
 			for (const id of ids) {
 				try {
-					docs.push({ id, file: await client.notes(id) });
+					const notes = await client.notes(id);
+					const doc = notes ? await client.doc(id).catch(() => null) : null;
+					items.push({ id, file: notes, doc });
 				} catch (e) {
-					docs.push({ id, file: null, error: e instanceof TextFoldError ? e.message : String(e) });
+					items.push({ id, file: null, doc: null, error: e instanceof TextFoldError ? e.message : String(e) });
 				}
 				if (run !== this.run) return;
 			}
+			const rec = this.plugin.folds.recordFor(file);
+			if (rec) await this.plugin.folds.refreshJobs([rec.paper]).catch(() => undefined);
 		}
+		if (run !== this.run) return;
+		this.reachable = !!client.state?.reachable;
+		this.items = this.reachable ? items : ids.map(id => ({ id, file: null, doc: null }));
+		await this.updateFold(false);
+		if (run !== this.run) return;
 		const state = client.state;
-		if (!state?.reachable) {
-			this.showStatus(`TextFold is not reachable at ${state?.url ?? r.url}.`, describeConnection(state));
-			this.render(ids.map(id => ({ id, file: null })), false);
-			return;
+		if (!this.reachable) this.showStatus(`TextFold is not reachable at ${state?.url ?? r.url}.`, describeConnection(state));
+		else {
+			const count = items.reduce((n, d) => n + (d.file?.notes.length ?? 0), 0);
+			this.showStatus(`${plural(ids.length, "document")} · ${plural(count, "note")}`, describeConnection(state));
 		}
-		const count = docs.reduce((n, d) => n + (d.file?.notes.length ?? 0), 0);
-		this.showStatus(`${plural(ids.length, "document")} · ${plural(count, "note")}`, describeConnection(state));
-		this.render(docs, true);
+		this.render();
+	}
+
+	/** How this note's fold stands, from what is known (no request but the note's own text). */
+	private async updateFold(render = true): Promise<void> {
+		const file = this.file;
+		const rec = file ? this.plugin.folds.recordFor(file) : undefined;
+		this.fold = file && rec && this.ids.includes(rec.paper) ? { rec, state: await this.plugin.folds.state(file, rec) } : null;
+		if (render && file === this.file) this.render();
 	}
 
 	private async paperIds(file: TFile): Promise<string[]> {
@@ -133,47 +178,101 @@ export class TextFoldNotesView extends ItemView {
 		setTooltip(this.statusEl, tooltip ?? text, { placement: "bottom" });
 	}
 
-	private render(docs: Doc[], reachable: boolean): void {
+	private render(): void {
 		this.card?.hide();
 		const list = this.listEl;
 		list.empty();
-		for (const doc of docs) {
-			const title = doc.file?.paper.title ?? doc.id;
-			const notes = doc.file ? sortNotes(doc.file.notes) : [];
-			const open = !this.collapsed.has(doc.id);
+		const reachable = this.reachable;
+		for (const item of this.items) {
+			const title = item.doc?.title || item.file?.paper.title || item.id;
+			const index = item.doc ? new DocIndex(item.doc) : null;
+			const groups = item.file ? groupNotes(item.file.notes, index) : [];
+			const count = item.file?.notes.length ?? 0;
+			const open = !this.collapsed.has(item.id);
 			const row = list.createDiv({ cls: "tfb-row tfb-doc" });
-			const chevron = row.createDiv("tfb-chevron");
-			setIcon(chevron, notes.length ? (open ? "chevron-down" : "chevron-right") : "file-text");
+			setIcon(row.createDiv("tfb-chevron"), count ? (open ? "chevron-down" : "chevron-right") : "file-text");
 			row.createDiv({ cls: "tfb-text", text: title });
-			if (notes.length) row.createDiv({ cls: "tfb-count", text: String(notes.length) });
-			const missing = reachable && !doc.file;
+			if (count) row.createDiv({ cls: "tfb-count", text: String(count) });
+			const missing = reachable && !item.file;
 			if (missing || !reachable) row.addClass("tfb-muted");
-			const tip = [title !== doc.id ? `${title}\n${doc.id}` : doc.id];
-			if (missing) tip.push(doc.error ?? "TextFold has no document with this id.");
+			const tip = [title !== item.id ? `${title}\n${item.id}` : item.id];
+			if (missing) tip.push(item.error ?? "TextFold has no document with this id.");
 			setTooltip(row, tip.join("\n"), { placement: "left" });
-			this.actions(row, { paper: doc.id }, title);
+			this.actions(row, { paper: item.id }, title, item.file ? item.id : undefined);
 			row.addEventListener("click", () => {
-				if (!notes.length) return;
-				if (open) this.collapsed.add(doc.id);
-				else this.collapsed.delete(doc.id);
-				this.render(docs, reachable);
+				if (!count) return;
+				if (open) this.collapsed.add(item.id);
+				else this.collapsed.delete(item.id);
+				this.render();
 			});
+			if (this.fold?.rec.paper === item.id && reachable) this.foldRow(list, this.fold);
 			if (!open) continue;
-			for (const note of notes) {
-				const line = noteLine(note) || KIND_NAME[note.kind];
-				const nrow = list.createDiv({ cls: `tfb-row tfb-item tfb-is-${note.kind}` });
-				setIcon(nrow.createDiv("tfb-kind"), KIND_ICON[note.kind]);
-				nrow.createDiv({ cls: "tfb-text", text: line });
-				const link = noteLink(doc.id, note);
-				this.actions(nrow, link, line);
-				nrow.addEventListener("click", () => void this.plugin.opener.open(link));
-				this.card?.attach(nrow, () => ({ note, paper: doc.id, sourcePath: this.file?.path ?? "" }));
+			for (const g of groups) {
+				if (g.name && (groups.length > 1 || g.name !== WHOLE)) list.createDiv({ cls: "tfb-section", text: g.name });
+				for (const note of g.notes) this.noteRow(list, item, note, index);
 			}
 		}
 	}
 
-	/** Open in TextFold, Copy link, Insert link at the cursor: icons at the row's right edge, shown on hover. */
-	private actions(row: HTMLElement, link: TextFoldLink, label: string): void {
+	private noteRow(list: HTMLElement, item: Item, note: Note, index: DocIndex | null): void {
+		const line = noteLine(note) || KIND_NAME[note.kind];
+		const row = list.createDiv({ cls: `tfb-row tfb-item tfb-is-${note.kind}` });
+		setIcon(row.createDiv("tfb-kind"), KIND_ICON[note.kind]);
+		row.createDiv({ cls: "tfb-text", text: line });
+		if (note.lost) {
+			row.addClass("tfb-lost");
+			const mark = row.createDiv({ cls: "tfb-lost-icon", attr: { "aria-label": "Passage not found after the edit" } });
+			setIcon(mark, "alert-triangle");
+		}
+		const link = noteLink(item.id, note);
+		this.actions(row, link, line);
+		row.addEventListener("click", () => void this.plugin.opener.open(link));
+		const s = index?.sectionOf(note.unit, note.section);
+		const section = note.on === "paper" ? WHOLE : s ? sectionName(s) : "";
+		this.card?.attach(row, () => ({ note, paper: item.id, section, sourcePath: this.file?.path ?? "" }));
+	}
+
+	/** The fold of this note: under way, failed, changed since, or done; with Refold or Open as fits. */
+	private foldRow(list: HTMLElement, fold: Fold): void {
+		const row = list.createDiv({ cls: "tfb-row tfb-item tfb-fold" });
+		const icon = row.createDiv("tfb-kind");
+		const text = row.createDiv("tfb-text");
+		const st = fold.state;
+		const refold = () => {
+			if (this.file) void this.plugin.folds.fold(this.file);
+		};
+		let action: [string, () => void] | null = null;
+		if (st.kind === "folding") {
+			setIcon(icon, "hourglass");
+			const j = st.job;
+			text.setText(`Folding${j ? ` · ${j.status === "queued" ? "waiting" : j.stage}${j.total ? ` ${j.done}/${j.total}` : ""}` : ""}…`);
+		} else if (st.kind === "failed") {
+			setIcon(icon, "alert-triangle");
+			text.setText(`Folding failed: ${st.error}`);
+			action = ["Refold", refold];
+		} else if (st.kind === "changed") {
+			setIcon(icon, "pencil");
+			text.setText("Changed since folding");
+			action = ["Refold", refold];
+		} else {
+			setIcon(icon, "check");
+			text.setText(`Folded ${fold.rec.at.slice(0, 10)} · ${fold.rec.lang}`);
+			action = ["Open in TextFold", () => void this.plugin.opener.open({ paper: fold.rec.paper, lang: fold.rec.lang })];
+		}
+		setTooltip(row, `${text.getText()}\n${fold.rec.paper}`, { placement: "left" });
+		if (action) {
+			const [label, fn] = action;
+			const b = row.createEl("button", { cls: "tfb-button", text: label });
+			b.addEventListener("click", e => {
+				e.stopPropagation();
+				fn();
+			});
+		}
+	}
+
+	/** Open in TextFold, Copy link, Insert link at the cursor, and for a document Import: icons at the row's right
+	 *  edge, shown on hover. */
+	private actions(row: HTMLElement, link: TextFoldLink, label: string, importId?: string): void {
 		const box = row.createDiv("tfb-actions");
 		const add = (icon: string, tip: string, fn: () => void) => {
 			const b = box.createDiv({ cls: "clickable-icon tfb-icon", attr: { "aria-label": tip } });
@@ -186,6 +285,16 @@ export class TextFoldNotesView extends ItemView {
 		add("external-link", "Open in TextFold", () => void this.plugin.opener.open(link));
 		add("copy", "Copy link", () => void this.copy(markdownLink(label, link)));
 		add("text-cursor-input", "Insert link at the cursor", () => this.insert(markdownLink(truncate(label, 80), link)));
+		if (importId) add("download", "Import its notes into the vault", () => void this.plugin.importer.importPapers([importId]));
+	}
+
+	private async importAll(): Promise<void> {
+		const ids = this.items.filter(i => i.file).map(i => i.id);
+		if (!ids.length) {
+			new Notice(this.reachable ? "No TextFold document is listed." : "TextFold is not reachable.");
+			return;
+		}
+		await this.plugin.importer.importPapers(ids);
 	}
 
 	private async copy(text: string): Promise<void> {
@@ -213,6 +322,8 @@ export class TextFoldNotesView extends ItemView {
 	}
 }
 
+type CardData = { note: Note; paper: string; section: string; sourcePath: string };
+
 /** The whole note beside the sidebar while a row is hovered: passage, the reader's text, the conversation. */
 class HoverCard extends Component {
 	private el: HTMLElement | null = null;
@@ -227,7 +338,7 @@ class HoverCard extends Component {
 		this.hide();
 	}
 
-	attach(row: HTMLElement, data: () => { note: Note; paper: string; sourcePath: string }): void {
+	attach(row: HTMLElement, data: () => CardData): void {
 		row.addEventListener("mouseenter", () => {
 			window.clearTimeout(this.timer);
 			this.timer = window.setTimeout(() => void this.show(row, data()), 350);
@@ -247,7 +358,7 @@ class HoverCard extends Component {
 		this.el = null;
 	}
 
-	private async show(row: HTMLElement, { note, paper, sourcePath }: { note: Note; paper: string; sourcePath: string }): Promise<void> {
+	private async show(row: HTMLElement, { note, paper, section, sourcePath }: CardData): Promise<void> {
 		this.hide();
 		if (!row.isConnected) return;
 		const doc = row.ownerDocument;
@@ -259,11 +370,12 @@ class HoverCard extends Component {
 		this.content.load();
 
 		const meta: string[] = [KIND_NAME[note.kind]];
-		if (note.on === "paper") meta.push("the whole paper");
+		if (section) meta.push(section);
 		if (note.level) meta.push(LEVEL_NAME[note.level]);
 		if (note.lang) meta.push(note.lang);
 		if (note.updated) meta.push(note.updated.slice(0, 10));
 		card.createDiv({ cls: "tfb-card-meta", text: meta.join(" · ") });
+		if (note.lost) lostLine(card);
 		if (note.quote) card.createDiv({ cls: "tfb-card-quote", text: note.quote });
 		if (note.text) card.createDiv({ cls: "tfb-card-text", text: note.text });
 		for (const turn of note.thread) {
@@ -292,11 +404,6 @@ function place(card: HTMLElement, row: HTMLElement): void {
 	top = Math.max(8, Math.min(top, win.innerHeight - h - 8));
 	card.setCssProps({ "--tfb-left": `${left}px`, "--tfb-top": `${top}px` });
 	card.addClass("is-placed");
-}
-
-/** Whole-paper conversations first (TextFold lists them first too), then the file's order. */
-function sortNotes(notes: Note[]): Note[] {
-	return [...notes.filter(n => n.on === "paper"), ...notes.filter(n => n.on !== "paper")];
 }
 
 function plural(n: number, word: string): string {

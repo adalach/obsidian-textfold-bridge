@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLink, findPaperIds, levelName, markdownLink, parseLink, readerUrl } from "../src/links";
+import { buildLink, findPaperIds, levelName, markdownLink, parseLink, readerUrl, withId, withoutId } from "../src/links";
 
 describe("parseLink", () => {
 	it("reads every part of a link", () => {
@@ -113,5 +113,22 @@ describe("findPaperIds", () => {
 
 	it("finds nothing in a note without TextFold", () => {
 		expect(findPaperIds("# A note\n[[Other note]] and https://example.org")).toEqual([]);
+	});
+});
+
+describe("withId and withoutId", () => {
+	it("adds a document to the textfold property, making a list only when needed", () => {
+		expect(withId(undefined, "md-a")).toBe("md-a");
+		expect(withId("", "md-a")).toBe("md-a");
+		expect(withId("pdf-x", "md-a")).toEqual(["pdf-x", "md-a"]);
+		expect(withId(["pdf-x"], "md-a")).toEqual(["pdf-x", "md-a"]);
+		expect(withId("md-a", "md-a")).toBe("md-a");
+	});
+
+	it("removes it again", () => {
+		expect(withoutId("md-a", "md-a")).toBeUndefined();
+		expect(withoutId(["pdf-x", "md-a"], "md-a")).toBe("pdf-x");
+		expect(withoutId(["pdf-x", "md-a", "y"], "md-a")).toEqual(["pdf-x", "y"]);
+		expect(withoutId("pdf-x", "md-a")).toBe("pdf-x");
 	});
 });

@@ -28,7 +28,10 @@ export interface Note {
 	text: string; // the reader's own note
 	thread: Turn[];
 	unit?: string;
+	section?: string;
 	on?: string; // "paper" for a conversation about the whole paper, "summary" or "title" for one on a section
+	tokens?: [number, number]; // first and last token of the passage in its unit
+	lost?: { since: string }; // its passage was not found again after the text was edited (refold in place)
 	level?: TextFoldLink["level"];
 	lang?: string;
 	updated: string;
@@ -86,7 +89,10 @@ function parseNote(data: unknown): Note | null {
 		text: str(o.text),
 		thread,
 		unit: str(anchor.unit) || undefined,
+		section: str(anchor.section) || undefined,
 		on: str(anchor.on) || undefined,
+		tokens: Array.isArray(anchor.tokens) && typeof anchor.tokens[0] === "number" && typeof anchor.tokens[1] === "number" ? [anchor.tokens[0], anchor.tokens[1]] : undefined,
+		lost: anchor.lost && typeof anchor.lost === "object" ? { since: str(obj(anchor.lost).since) } : undefined,
 		level: levelName(anchor.level),
 		lang: str(anchor.lang) || undefined,
 		updated: str(o.updated) || str(o.created),

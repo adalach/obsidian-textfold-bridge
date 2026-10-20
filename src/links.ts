@@ -98,3 +98,17 @@ export function findPaperIds(text: string, frontmatterValue?: unknown): string[]
 	for (const m of text.matchAll(LINK_IN_TEXT)) add(parseLink(m[0].replace(/[.,;:!?]+$/, ""))?.paper);
 	return ids;
 }
+
+/** The property's value with this document added: a single id stays a single id, two become a list. */
+export function withId(value: unknown, id: string): unknown {
+	if (value === undefined || value === null || value === "") return id;
+	const list: unknown[] = Array.isArray(value) ? value : [value];
+	return list.includes(id) ? value : [...list, id];
+}
+
+/** The property's value without this document; undefined when nothing is left. */
+export function withoutId(value: unknown, id: string): unknown {
+	if (!Array.isArray(value)) return value === id ? undefined : value;
+	const left = (value as unknown[]).filter(x => x !== id);
+	return left.length === 0 ? undefined : left.length === 1 ? left[0] : left;
+}

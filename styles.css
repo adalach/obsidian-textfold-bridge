@@ -105,6 +105,54 @@
 	display: none;
 }
 
+/* a section's name above its notes, and a folded note's state */
+.tfb-section {
+	padding: 4px 8px 0 22px;
+	overflow: hidden;
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+}
+
+.tfb-fold {
+	cursor: default;
+	color: var(--text-muted);
+}
+
+.tfb-fold .tfb-kind {
+	color: var(--text-accent);
+}
+
+.tfb-button {
+	flex: none;
+	height: auto;
+	padding: 0 6px;
+	font-size: var(--font-ui-smaller);
+	line-height: 18px;
+}
+
+.tfb-lost .tfb-text {
+	color: var(--text-muted);
+	font-style: italic;
+}
+
+.tfb-lost-icon {
+	display: flex;
+	flex: none;
+	color: var(--text-warning);
+	--icon-size: var(--icon-xs);
+}
+
+.tfb-lost-line {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	margin: 2px 0;
+	color: var(--text-warning);
+	font-size: var(--font-ui-smaller);
+}
+
 /* the whole note while its row is hovered, beside the sidebar */
 .tfb-card {
 	position: fixed;
@@ -192,4 +240,32 @@
 	text-overflow: ellipsis;
 	color: var(--text-faint);
 	font-size: var(--font-ui-smaller);
+}
+
+/* hover previews of textfold:// links */
+.tfb-hover {
+	max-width: 420px;
+}
+
+.tfb-hover-body {
+	padding: 6px 10px;
+	font-size: var(--font-ui-small);
+}
+
+.tfb-hover-meta {
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+}
+
+.tfb-hover-title {
+	margin-top: 2px;
+	font-weight: var(--font-semibold);
+}
+
+.tfb-hover-text {
+	margin-top: 2px;
+}
+
+.tfb-hover-text > p {
+	margin: 2px 0;
 }

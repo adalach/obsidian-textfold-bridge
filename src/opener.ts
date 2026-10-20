@@ -39,18 +39,10 @@ export class LinkOpener {
 			}
 		});
 
-		// the main window and every pop-out window
-		const docs = new Set<Document>();
-		const listen = (doc: Document) => {
-			if (docs.has(doc)) return;
-			docs.add(doc);
+		listenDocuments(plugin, doc => {
 			plugin.registerDomEvent(doc, "click", e => this.onClick(e), { capture: true });
 			plugin.registerDomEvent(doc, "auxclick", e => this.onClick(e), { capture: true });
-		};
-		listen(document);
-		plugin.app.workspace.onLayoutReady(() => plugin.app.workspace.iterateAllLeaves(leaf => listen(leaf.view.containerEl.ownerDocument)));
-		plugin.registerEvent(plugin.app.workspace.on("window-open", w => listen(w.doc)));
-		plugin.registerEvent(plugin.app.workspace.on("window-close", w => docs.delete(w.doc)));
+		});
 	}
 
 	private onClick(evt: MouseEvent): void {
@@ -81,4 +73,18 @@ export class LinkOpener {
 		}
 		this.nativeOpen(readerUrl(r.url, link), "_external"); // the system browser, not Obsidian's web viewer
 	}
+}
+
+/** Run fn once for the main window's document and for every pop-out window's, now and when one opens. */
+export function listenDocuments(plugin: Plugin, fn: (doc: Document) => void): void {
+	const docs = new Set<Document>();
+	const add = (doc: Document) => {
+		if (docs.has(doc)) return;
+		docs.add(doc);
+		fn(doc);
+	};
+	add(document);
+	plugin.app.workspace.onLayoutReady(() => plugin.app.workspace.iterateAllLeaves(leaf => add(leaf.view.containerEl.ownerDocument)));
+	plugin.registerEvent(plugin.app.workspace.on("window-open", w => add(w.doc)));
+	plugin.registerEvent(plugin.app.workspace.on("window-close", w => docs.delete(w.doc)));
 }

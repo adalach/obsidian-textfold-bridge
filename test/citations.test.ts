@@ -95,13 +95,21 @@ describe("by paper, with what TextFold says", () => {
 
 	it("tells what each citation cites", () => {
 		expect(citedText(cites[1], doc, nf)).toBe("Greedy fitting");
-		expect(citedText(cites[2], doc, nf)).toBe("Greedy fitting of convex primitives");
+		expect(citedText(cites[2], doc, nf)).toBe("3 Method"); // a section by its heading
 		expect(citedText(cites[3], doc, nf)).toBe("Why convex?");
 		expect(citedText(cites[0], null, null)).toBeNull();
 		const [turn] = findCitations("[a turn](textfold://open?paper=2602.07369&n=n-1&t=1)");
 		expect(citedText(turn, doc, nf)).toBe("And why greedy?");
 		const [gone] = findCitations("[a turn](textfold://open?paper=2602.07369&n=n-1&t=7)");
 		expect(citedText(gone, doc, nf)).toBe("Why convex?");
+	});
+
+	it("shows a range of paragraphs as its first and how many follow", () => {
+		const [range] = findCitations("[two](textfold://open?paper=2602.07369&u=S1.p1.1&to=S3.p1.1&level=full)");
+		expect(range.link.to).toBe("S3.p1.1");
+		expect(citedText(range, doc, nf)).toBe("Intro. … (+1)");
+		const [one] = findCitations("[one](textfold://open?paper=2602.07369&u=S1.p1.1&to=S9.p9&level=full)");
+		expect(citedText(one, doc, nf)).toBe("Intro.");
 	});
 
 	it("groups by paper in the order first cited, then by section in the paper's order", () => {

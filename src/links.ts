@@ -1,9 +1,10 @@
 // textfold:// links: parse and build them, map them to TextFold's reader URL, and find the documents a note refers to.
 // Pure functions without runtime imports from obsidian, so test/links.test.ts can run them in Node.
 //
-//   textfold://open?paper=<document id>[&s=<section id>][&u=<paragraph id>][&n=<note id>[&t=<turn>]][&level=<full|brief|key|takeaway|topic>][&lang=<code>]
-//   -> <server>/p/<id>?lang=<code>#n=<note id>&t=<turn>&u=<paragraph id>&s=<section id>&level=<name>
-// t is a turn of a conversation (0 is the first), and means something only with n.
+//   textfold://open?paper=<document id>[&s=<section id>][&u=<paragraph id>[&to=<paragraph id>]][&n=<note id>[&t=<turn>]][&level=<full|brief|key|takeaway|topic>][&lang=<code>]
+//   -> <server>/p/<id>?lang=<code>#n=<note id>&t=<turn>&u=<paragraph id>&to=<paragraph id>&s=<section id>&level=<name>
+// t is a turn of a conversation (0 is the first), and means something only with n; to is the last of a range of
+// paragraphs from u (the reader flashes them all), and means something only with u.
 
 export const LEVELS = ["full", "brief", "key", "takeaway", "topic"] as const;
 export type Level = (typeof LEVELS)[number];
@@ -17,6 +18,7 @@ export interface TextFoldLink {
 	paper: string;
 	s?: string; // section id, such as S3 or sec-introduction
 	u?: string; // paragraph (unit) id, such as S2.SS3.p2
+	to?: string; // with u: the last paragraph of a range from u, in reading order
 	n?: string; // note id, such as n-k3f9a2qx
 	t?: number; // a turn of the note's conversation, 0 the first (only with n)
 	level?: Level;
@@ -26,6 +28,7 @@ export interface TextFoldLink {
 // TextFold's document ids: arXiv ids, md-…, pdf-…, zotero-…, pmc…, wiki-…; its routes accept [\w.-]+
 const PAPER_ID = /^[\w.-]{1,120}$/;
 const NOTE_ID = /^[\w-]{1,80}$/;
+const UNIT_ID = /^[\w.-]{1,200}$/; // as TextFold's links.js checks u and to
 const LANG = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8})*$/;
 
 export function isPaperId(id: string): boolean {
@@ -46,6 +49,8 @@ export function parseLink(href: string): TextFoldLink | null {
 	if (sec) link.s = sec;
 	const u = place(q.get("u"));
 	if (u) link.u = u;
+	const to = q.get("to");
+	if (link.u && to && UNIT_ID.test(to) && to !== link.u) link.to = to;
 	const n = q.get("n");
 	if (n && NOTE_ID.test(n)) link.n = n;
 	const t = q.get("t");
@@ -62,6 +67,7 @@ export function buildLink(link: TextFoldLink): string {
 	const parts = [`paper=${encodeURIComponent(link.paper)}`];
 	if (link.s) parts.push(`s=${encodeURIComponent(link.s)}`);
 	if (link.u) parts.push(`u=${encodeURIComponent(link.u)}`);
+	if (link.u && link.to) parts.push(`to=${encodeURIComponent(link.to)}`);
 	if (link.n) parts.push(`n=${encodeURIComponent(link.n)}`);
 	if (link.n && link.t !== undefined) parts.push(`t=${link.t}`);
 	if (link.level) parts.push(`level=${link.level}`);
@@ -70,8 +76,8 @@ export function buildLink(link: TextFoldLink): string {
 }
 
 /** The reader URL on a running TextFold server (base such as http://127.0.0.1:3017). The reader reads #n= (with #t=,
- *  a turn of its conversation), #u=, #s= and #level= each on its own; with both a note and a paragraph, the paragraph is
- *  where it goes when the note is gone. */
+ *  a turn of its conversation), #u= (with #to=, the range's last paragraph), #s= and #level= each on its own; with
+ *  both a note and a paragraph, the paragraph is where it goes when the note is gone. */
 export function readerUrl(base: string, link: TextFoldLink): string {
 	let url = `${base.replace(/\/+$/, "")}/p/${encodeURIComponent(link.paper)}`;
 	if (link.lang) url += `?lang=${encodeURIComponent(link.lang)}`;
@@ -79,6 +85,7 @@ export function readerUrl(base: string, link: TextFoldLink): string {
 	if (link.n) hash.push(`n=${encodeURIComponent(link.n)}`);
 	if (link.n && link.t !== undefined) hash.push(`t=${link.t}`); // the reader scrolls the conversation to that turn
 	if (link.u) hash.push(`u=${encodeURIComponent(link.u)}`);
+	if (link.u && link.to) hash.push(`to=${encodeURIComponent(link.to)}`);
 	if (link.s) hash.push(`s=${encodeURIComponent(link.s)}`);
 	if (link.level) hash.push(`level=${link.level}`);
 	return hash.length ? `${url}#${hash.join("&")}` : url;

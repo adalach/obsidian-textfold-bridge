@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseDoc } from "../src/doc";
-import { DRAG_MIME, DragItem, formatItem, isItem, itemFromLink, itemLabel, itemSentence, jsonFromHtml, linkFromText, parseDragJson, readTransfer, toDragJson } from "../src/drag";
+import { DRAG_MIME, DragItem, formatItem, isItem, itemFromLink, itemLabel, itemSentence, jsonFromHtml, linkFromText, multiLine, parseDragJson, readTransfer, toDragJson } from "../src/drag";
 import { parseNotes } from "../src/notes";
 
 // what TextFold's reader sends when a paragraph is dragged at Key (the contract, with made-up text)
@@ -157,8 +157,19 @@ describe("itemFromLink", () => {
 		expect(itemFromLink({ paper: "2602.07369", u: "S3.p3", level: "key" }, doc, null)).toMatchObject({ text: "No levels yet.", written: false });
 	});
 
-	it("fills a section link with its summary", () => {
-		expect(itemFromLink({ paper: "2602.07369", s: "S3", level: "topic" }, doc, null)).toMatchObject({ kind: "section", text: "greedy fitting", written: true });
+	it("fills a section link with its heading, summary and paragraphs, as TextFold drags a section", () => {
+		expect(itemFromLink({ paper: "2602.07369", s: "S3", level: "topic" }, doc, null)).toMatchObject({
+			kind: "section", heading: "3 Method", text: "greedy fitting\n- Greedy fitting\n- No levels yet.", units: ["S3.p2", "S3.p3"], written: true,
+		});
+		expect(itemFromLink({ paper: "2602.07369", s: "S3", level: "full" }, doc, null)).toMatchObject({
+			text: "Primitives are fitted greedily. Each is convex.\n\nNo levels yet.", written: false,
+		});
+	});
+
+	it("fills a range link with a block per paragraph", () => {
+		const it = itemFromLink({ paper: "2602.07369", u: "S3.p3", to: "S3.p2", level: "takeaway" }, doc, null);
+		expect(it).toMatchObject({ kind: "selection", text: "Greedy fitting\n\nNo levels yet.", units: ["S3.p2", "S3.p3"], written: true, link: { u: "S3.p3", to: "S3.p2" } });
+		expect(itemFromLink({ paper: "2602.07369", u: "S3.p2", to: "S9.p1" }, doc, null)).toMatchObject({ kind: "paragraph", units: ["S3.p2"] });
 	});
 
 	it("fills a link to one turn with that turn's answer, its question as the comment", () => {
@@ -232,3 +243,74 @@ describe("messages of a conversation and Topic cards, as TextFold sends them", (
 	});
 });
 
+describe("drops of several paragraphs", () => {
+	// a section dragged by its heading at Takeaway, and a selection over two paragraphs at Full (made-up text)
+	const section = parseDragJson(JSON.stringify({
+		...wire, section: { id: "S2", num: "2", title: "Experiments" }, heading: "2 Experiments", kind: "section", level: "takeaway", written: true,
+		text: "Two benchmarks show the gain.\n- Thingi10K meshes decompose exactly\n- Queries run faster\n\n2.1 Setup\nMeshes and machines.\n- A laptop CPU",
+		units: ["S2.p1", "S2.p2", "S2.SS1.p1"], link: "textfold://open?paper=2602.07369&s=S2&level=takeaway",
+	}))!;
+	const selection = parseDragJson(JSON.stringify({
+		...wire, kind: "selection", level: "full", written: false, text: "We collect meshes.\n\nQueries run faster.", quote: "We collect meshes.\n\nQueries run faster.",
+		units: ["S1.p5.1", "S1.p6"], link: "textfold://open?paper=2602.07369&u=S1.p5.1&to=S1.p6&level=full",
+	}))!;
+
+	it("reads the heading, the units and a range link", () => {
+		expect(section).toMatchObject({ heading: "2 Experiments", units: ["S2.p1", "S2.p2", "S2.SS1.p1"], link: { s: "S2", level: "takeaway" } });
+		expect(selection.link).toEqual({ paper: "2602.07369", u: "S1.p5.1", to: "S1.p6", level: "full" });
+		expect(parseDragJson(JSON.stringify({ ...wire, units: ["ok.1", "bad id", 3] }))!.units).toEqual(["ok.1"]);
+		expect(multiLine(section) && multiLine(selection) && !multiLine(parseDragJson(JSON.stringify(wire))!)).toBe(true);
+	});
+
+	it("writes a callout titled by the heading, every line quoted, bullets kept, the icon at the end", () => {
+		expect(formatItem(section, "callout")).toBe([
+			"> [!textfold|written] Convex Primitive Decomposition › 2 Experiments",
+			"> Two benchmarks show the gain.",
+			"> - Thingi10K meshes decompose exactly",
+			"> - Queries run faster",
+			">",
+			"> 2.1 Setup",
+			"> Meshes and machines.",
+			"> - A laptop CPU [↗](textfold://open?paper=2602.07369&s=S2&level=takeaway)",
+		].join("\n"));
+		expect(formatItem(selection, "callout")).toBe([
+			"> [!textfold] Convex Primitive Decomposition › 3 Method",
+			"> We collect meshes.",
+			">",
+			"> Queries run faster. [↗](textfold://open?paper=2602.07369&u=S1.p5.1&to=S1.p6&level=full)",
+		].join("\n"));
+	});
+
+	it("writes a multi-line quote, a section's heading in bold on its first line", () => {
+		const q = formatItem(section, "quote").split("\n");
+		expect(q[0]).toBe("> **2 Experiments**");
+		expect(q[1]).toBe("> Two benchmarks show the gain.");
+		expect(q.at(-1)).toBe("> - A laptop CPU *(written by the model)* [↗](textfold://open?paper=2602.07369&s=S2&level=takeaway)");
+		expect(q.every(l => l === ">" || l.startsWith("> "))).toBe(true);
+		expect(formatItem(selection, "quote")).toBe("> We collect meshes.\n>\n> Queries run faster. [↗](textfold://open?paper=2602.07369&u=S1.p5.1&to=S1.p6&level=full)");
+	});
+
+	it("writes Text as a bold heading line and the lines as they came, the icon at the end", () => {
+		expect(formatItem(section, "icon")).toBe([
+			"**2 Experiments**",
+			"Two benchmarks show the gain.",
+			"- Thingi10K meshes decompose exactly",
+			"- Queries run faster",
+			"",
+			"2.1 Setup",
+			"Meshes and machines.",
+			"- A laptop CPU [↗](textfold://open?paper=2602.07369&s=S2&level=takeaway)",
+		].join("\n"));
+		expect(formatItem(selection, "icon")).toBe("We collect meshes.\n\nQueries run faster. [↗](textfold://open?paper=2602.07369&u=S1.p5.1&to=S1.p6&level=full)");
+	});
+
+	it("writes Full link as one titled link", () => {
+		expect(formatItem(section, "link")).toBe("[Convex Primitive Decomposition › 2 Experiments](textfold://open?paper=2602.07369&s=S2&level=takeaway)");
+		expect(formatItem(selection, "link")).toBe("[Convex Primitive Decomposition › 3 Method](textfold://open?paper=2602.07369&u=S1.p5.1&to=S1.p6&level=full)");
+	});
+
+	it("keeps the heading and units in the JSON the sidebar sends", () => {
+		const back = parseDragJson(toDragJson(section))!;
+		expect(back).toMatchObject({ heading: "2 Experiments", units: ["S2.p1", "S2.p2", "S2.SS1.p1"], kind: "section" });
+	});
+});

@@ -5,7 +5,7 @@
 import { EditorView } from "@codemirror/view";
 import { Component, HoverParent, HoverPopover, Keymap, MarkdownRenderer, Plugin, setIcon } from "obsidian";
 import type { TextFoldClient } from "./client";
-import { DocIndex, sectionName, sectionSummary, unitText } from "./doc";
+import { DocIndex, sectionName, sectionText, unitText } from "./doc";
 import { Level, TextFoldLink, parseLink } from "./links";
 import { NotesFile, Paper, citationLinks, noteLine } from "./notes";
 import { missingPaper } from "./opener";
@@ -144,27 +144,31 @@ export class LinkPreviews {
 				body.createDiv({ cls: "tfb-hover-text", text: doc ? "This section is not in the document any more." : `Section ${link.s}.` });
 				return;
 			}
-			const summary = sectionSummary(s, level);
+			// its heading, then its summary and paragraphs (its subsections' too) at the level, as a drag of it has them
+			const st = index ? sectionText(index, s.id, level) : null;
 			if (s.title) body.createDiv({ cls: "tfb-hover-title", text: sectionName(s) });
 			const text = body.createDiv("tfb-hover-text markdown-rendered");
-			if (summary) await MarkdownRenderer.render(this.plugin.app, summary.replace(/\[\[/g, "\\[\\["), text, "", owner);
+			if (st?.text) await MarkdownRenderer.render(this.plugin.app, capBlocks(st.text).replace(/\[\[/g, "\\[\\["), text, "", owner);
 			else text.setText(`${plural(s.units.length, "paragraph")}; no summary yet.`);
 			return;
 		}
 
 		if (link.u) {
-			const unit = index?.unit(link.u);
+			// a paragraph, or the paragraphs from u to to, at the link's level
+			const units = index?.range(link.u, link.to) ?? [];
 			const s = index?.sectionOf(link.u);
 			if (s) head.push(sectionName(s));
+			if (units.length > 1) head.push(plural(units.length, "paragraph"));
 			const level: Level = link.level ?? "takeaway";
 			head.push(LEVEL_NAME[level]);
 			meta.setText(head.join(" · "));
-			if (!unit) {
+			if (!units.length) {
 				body.createDiv({ cls: "tfb-hover-text", text: doc ? "This paragraph is not in the document any more." : `Paragraph ${link.u}.` });
 				return;
 			}
 			const text = body.createDiv("tfb-hover-text markdown-rendered");
-			await MarkdownRenderer.render(this.plugin.app, unitText(unit, level).replace(/\[\[/g, "\\[\\["), text, "", owner);
+			const md = capBlocks(units.map(u => unitText(u, level)).join("\n\n"));
+			await MarkdownRenderer.render(this.plugin.app, md.replace(/\[\[/g, "\\[\\["), text, "", owner);
 			return;
 		}
 
@@ -196,6 +200,12 @@ export function lostLine(el: HTMLElement): void {
 	const line = el.createDiv("tfb-lost-line");
 	setIcon(line.createSpan("tfb-lost-icon"), "alert-triangle");
 	line.createSpan({ text: "Passage not found after the edit" });
+}
+
+/** At most a dozen blocks of a long section or range, and how many more there are. */
+function capBlocks(md: string, max = 12): string {
+	const blocks = md.split(/\n{2,}/);
+	return blocks.length <= max ? md : `${blocks.slice(0, max).join("\n\n")}\n\n*… ${blocks.length - max} more*`;
 }
 
 function plural(n: number, word: string): string {

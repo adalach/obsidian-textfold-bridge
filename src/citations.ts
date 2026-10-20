@@ -116,7 +116,8 @@ function plain(s: string): string {
 }
 
 /** What a citation cites, from TextFold: a note's quote (an Ask's question: the linked turn's, else the first), a
- *  paragraph or a section's summary at the link's level (else Takeaway); null when TextFold gave nothing for it. */
+ *  paragraph at the link's level (else Takeaway), a range of them as its first and how many follow ("… (+2)"), a
+ *  section by its heading (its summary when it has no title); null when TextFold gave nothing for it. */
 export function citedText(c: Citation, doc: Doc | null, nf: NotesFile | null): string | null {
 	const index = doc ? new DocIndex(doc) : null;
 	const level = c.link.level ?? "takeaway";
@@ -127,12 +128,14 @@ export function citedText(c: Citation, doc: Doc | null, nf: NotesFile | null): s
 		return note.quote || note.text || null;
 	}
 	if (c.link.u) {
-		const unit = index?.unit(c.link.u);
-		return unit ? unitText(unit, level) : null;
+		const units = index?.range(c.link.u, c.link.to) ?? [];
+		if (!units.length) return null;
+		const first = unitText(units[0], level);
+		return units.length > 1 ? `${first.replace(/\s+/g, " ").trim()} … (+${units.length - 1})` : first;
 	}
 	if (c.link.s) {
 		const s = index?.sections.get(c.link.s);
-		return s ? sectionSummary(s, level) || sectionName(s) || null : null;
+		return s ? sectionName(s) || sectionSummary(s, level) || null : null;
 	}
 	return null;
 }

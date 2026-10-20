@@ -93,6 +93,29 @@ export function sectionSummary(s: DocSection, level: Level): string {
 	return (level === "topic" ? s.topic || s.takeaway : s.takeaway).trim();
 }
 
+/** A section as TextFold's reader drags it by its heading: its name ("2.1 Method"), and its text at a level in blocks
+ *  separated by blank lines. At Key, Takeaway and Topic the section's own block is its summary line and a "- " line
+ *  per paragraph, and each subsection's block its name, its summary and its paragraphs the same way; at Full and Brief
+ *  every paragraph is a block of its own, each subsection's name a block before its paragraphs. `units` are all the
+ *  paragraphs, subsections' included, in reading order. */
+export function sectionText(index: DocIndex, id: string, level: Level): { heading: string; text: string; units: string[] } | null {
+	const all = index.withSubsections(id);
+	if (!all.length) return null;
+	const oneLine = (t: string) => t.replace(/\s+/g, " ").trim();
+	const blocks: string[] = [];
+	all.forEach((x, i) => {
+		const name = i > 0 ? sectionName(x) : "";
+		if (isWritten(level)) {
+			const lines = [name, sectionSummary(x, level), ...x.units.map(u => `- ${oneLine(unitText(u, level))}`)].filter(Boolean);
+			if (lines.length) blocks.push(lines.join("\n"));
+		} else {
+			if (name && x.units.length) blocks.push(name);
+			for (const u of x.units) blocks.push(unitText(u, level));
+		}
+	});
+	return { heading: sectionName(all[0]), text: blocks.join("\n\n"), units: all.flatMap(x => x.units.map(u => u.id)) };
+}
+
 /** Whether a level's text is a model's words (Key, Takeaway, Topic) rather than the author's (Full, Brief). */
 export function isWritten(level: Level): boolean {
 	return level === "key" || level === "takeaway" || level === "topic";
@@ -103,6 +126,7 @@ export class DocIndex {
 	readonly sections = new Map<string, DocSection>();
 	private unitSection = new Map<string, DocSection>();
 	private units = new Map<string, DocUnit>();
+	private list: DocUnit[] = []; // in reading order
 	private order = new Map<string, number>();
 	private sectionOrder = new Map<string, number>();
 
@@ -115,6 +139,7 @@ export class DocIndex {
 				this.units.set(u.id, u);
 				this.unitSection.set(u.id, s);
 				this.order.set(u.id, n++);
+				this.list.push(u);
 			}
 		}
 	}
@@ -132,6 +157,27 @@ export class DocIndex {
 		if (unit && this.order.has(unit)) return this.order.get(unit) ?? 0;
 		if (section && this.sectionOrder.has(section)) return (this.sectionOrder.get(section) ?? 0) - 0.5;
 		return Number.MAX_SAFE_INTEGER;
+	}
+
+	/** The paragraphs from one to another in reading order (either way round, as TextFold's reader takes #u=…&to=…);
+	 *  the first alone when the other is not in the document, none when the first is not. */
+	range(from: string, to?: string): DocUnit[] {
+		const a = this.order.get(from);
+		if (a === undefined) return [];
+		const b = to === undefined ? undefined : this.order.get(to);
+		if (b === undefined) return [this.list[a]];
+		return this.list.slice(Math.min(a, b), Math.max(a, b) + 1);
+	}
+
+	/** A section with its subsections: the sections after it that are deeper, up to one at its depth or above (so a
+	 *  "2 Experiments" without paragraphs of its own brings 2.1–2.4 with it), as TextFold's reader drags a section. */
+	withSubsections(id: string): DocSection[] {
+		const all = this.doc.sections;
+		const i = all.findIndex(x => x.id === id);
+		if (i < 0) return [];
+		const out = [all[i]];
+		for (let j = i + 1; j < all.length && all[j].depth > all[i].depth; j++) out.push(all[j]);
+		return out;
 	}
 
 	/** A cited paragraph as TextFold's reader labels it: its section and its place in it (§3 ¶2). */

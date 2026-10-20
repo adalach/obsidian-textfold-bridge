@@ -9,7 +9,7 @@
 ## What it does
 
 - **`textfold://` links.** A link opens the paper in TextFold, at a paragraph, a note or a zoom level. Click it in Reading view, in Live Preview or in the sidebar.
-- **Hover previews.** Hover a link to see its paragraph (at the link's level, else Takeaway), its section's title and summary, its note, one turn of a conversation (question and answer), or the paper's title and authors. In Reading view a hover is enough; in the editor hold Cmd (Ctrl on Windows and Linux), as with Obsidian's page previews.
+- **Hover previews.** Hover a link to see its paragraph (at the link's level, else Takeaway) or its range of paragraphs, its section's heading, summary and paragraphs, its note, one turn of a conversation (question and answer), or the paper's title and authors. In Reading view a hover is enough; in the editor hold Cmd (Ctrl on Windows and Linux), as with Obsidian's page previews.
 - **Drops from TextFold.** Drag a paragraph, a section's summary, a note, a conversation or a selection from TextFold's reader into any note, or copy and paste it: it goes in where you drop it, with its title, section and a link back.
 - **Insert link to a TextFold paper.** A command that searches TextFold's documents by title, id or citekey and inserts `[Title](textfold://open?paper=ID)` at the cursor. With text selected, the selection becomes the link's label.
 - **TextFold sidebar.** For the note you are in, two lists behind a switch at the top. **In this note**: every TextFold citation in the note, one line each with what it cites; a click goes to that place in the note. **In TextFold**: the TextFold documents the note refers to, each with its highlights, comments and Ask conversations under their sections; hover a line to read the whole note with the model's answer, open TextFold at it, copy or insert its link, or drag it into a note. Open the sidebar with the command **Open TextFold notes**.
@@ -30,7 +30,7 @@ The zoning step follows [Convex Partition Zoner](textfold://open?paper=pdf-357ae
 
 ## Citations in this note
 
-**In this note**, at the top of the sidebar, lists every `textfold://` link in the open note, in reading order: plain links, dropped callouts and quotes, and the ↗ icon links alike. A line shows what the link cites, as TextFold has it (the paragraph or section summary at the link's level, else Takeaway; a note's passage; an Ask's question, the linked turn's for a link to one turn), or else the link's own words, and on the right the paper's short title. Hover a line to preview it.
+**In this note**, at the top of the sidebar, lists every `textfold://` link in the open note, in reading order: plain links, dropped callouts and quotes, and the ↗ icon links alike. A line shows what the link cites, as TextFold has it (the paragraph at the link's level, else Takeaway; for a range of paragraphs the first and how many follow, as "… (+2)"; a section's heading; a note's passage; an Ask's question, the linked turn's for a link to one turn), or else the link's own words, and on the right the paper's short title. Hover a line to preview it.
 
 - **Click a line** to go to the link in the note: it scrolls into the middle and lights up for a moment, with the cursor on it in Live Preview and Source mode; in Reading view its line and the link light up.
 - **The TextFold icon** on a line (shown on hover) opens TextFold there, as a click on the link would.
@@ -40,7 +40,7 @@ The list follows the note as you edit it and as you switch notes; it asks TextFo
 
 ## Drops from TextFold
 
-Drag something from TextFold's reader (a paragraph by its handle, a heading, a summary, a chip of the Topic map, a note's card, or selected text) into a note, or copy it and paste. The item goes in at the drop point, as set under **Settings → TextFold Bridge → Drops from TextFold → Dropped TextFold items as**:
+Drag something from TextFold's reader (a paragraph by its handle, a section by its heading, a summary, a card or chip of the Topic map, a note's card, or selected text, also over several paragraphs) into a note, or copy it and paste. The item goes in at the drop point, as set under **Settings → TextFold Bridge → Drops from TextFold → Dropped TextFold items as**:
 
 - **Callout** (default):
 
@@ -60,7 +60,9 @@ Drag something from TextFold's reader (a paragraph by its handle, a heading, a s
   A paragraph, summary, selection or chip goes in as it read; a note as its passage, then your comment; a conversation as its answer in one sentence. Dropped among words it goes in among them, else on a line of its own. The plugin draws every `textfold://` link labelled exactly `↗` as TextFold's icon, in Reading view and in Live Preview (put the cursor in it to edit the Markdown); a click opens TextFold there and a hover previews it. Without the plugin, on another device or in another app, it reads as the text and a ↗ link.
 - **Full link**: a titled link, `[Title › Section](link)`, among the words where it was dropped.
 
-A dragged or pasted bare `textfold://` link is filled in the same way from TextFold (title, section, the paragraph or summary at the link's level). Every other drop and paste is left to Obsidian. Rows of the TextFold notes sidebar can be dragged into a note the same way.
+**Several paragraphs at once.** A section dragged by its heading brings its summary and its paragraphs at the level it was dragged at, its subsections' too: at Key, Takeaway and Topic as `- ` bullets under each summary, at Full and Brief as paragraphs. A selection over several paragraphs brings the selected words, a paragraph each, and its link covers them all (`u=<first>&to=<last>`): opened, TextFold lights up every one of them. A selection of a few words in one paragraph brings those words and links to the whole paragraph. As a **Callout** the title is the paper and the section's heading, and every line is quoted, bullets kept; a **Quote** has the heading in bold on its first line; **Text** has a bold heading line, then the lines as they came, on lines of their own even when dropped among words; **Full link** is one titled link. Each ends with the TextFold icon on its last line.
+
+A dragged or pasted bare `textfold://` link is filled in the same way from TextFold (title, section, the paragraph, the range of paragraphs or the section at the link's level). Every other drop and paste is left to Obsidian. Rows of the TextFold notes sidebar can be dragged into a note the same way.
 
 ## Fold this note
 
@@ -113,11 +115,11 @@ Section names, paragraph previews and the cite labels in imported answers come f
 ## Links
 
 ```
-textfold://open?paper=<document id>[&s=<section id>][&u=<paragraph id>][&n=<note id>[&t=<turn>]][&level=<full|brief|key|takeaway|topic>][&lang=<code>]
+textfold://open?paper=<document id>[&s=<section id>][&u=<paragraph id>[&to=<paragraph id>]][&n=<note id>[&t=<turn>]][&level=<full|brief|key|takeaway|topic>][&lang=<code>]
 ```
 
 - `paper`: the document's id in TextFold, as in its reader's address (`/p/<id>`).
-- `s`: a section; `u`: a paragraph; `n`: one of your notes; `t`: with `n`, one turn of its conversation (0 is the first question), which TextFold scrolls to in the chat or the note's window; `level`: the zoom level; `lang`: the language to read it in.
+- `s`: a section; `u`: a paragraph; `to`: with `u`, the last paragraph of a range from `u`, which TextFold lights up together; `n`: one of your notes; `t`: with `n`, one turn of its conversation (0 is the first question), which TextFold scrolls to in the chat or the note's window; `level`: the zoom level; `lang`: the language to read it in.
 
 Before it opens a link, the plugin asks the running TextFold whether it has the document. If it has not (a link to a paper in another TextFold library, or one deleted since), a notice names the paper and nothing opens, instead of TextFold's home screen. If TextFold is not running, a link in **TextFold app** mode opens anyway, which starts the app.
 

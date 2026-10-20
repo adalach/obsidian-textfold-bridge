@@ -4,10 +4,13 @@
 // TextFold sends `application/x-textfold+json` (also as JSON in a `data-textfold` attribute of its text/html, for
 // programs that drop custom types between apps):
 //   {"format": "textfold/drag", "version": 1, "paper", "title", "authors": [..], "citekey"?, "section": {"id", "num",
-//    "title"} | null, "kind": "note" | "ask" | "paragraph" | "summary" | "section" | "selection" | "chip", "level",
-//    "lang", "text", "written", "quote"?, "comment"?, "link"}
+//    "title"} | null, "heading"?, "kind": "note" | "ask" | "paragraph" | "summary" | "section" | "selection" | "chip",
+//    "level", "lang", "text", "written", "units"?, "quote"?, "comment"?, "link"}
+// A section dragged by its heading (kind "section", link s=…) has "heading" ("2.1 Method") and its text in blocks
+// separated by blank lines ("- " lines at Key, Takeaway and Topic); a selection over several paragraphs has the link
+// u=<first>&to=<last> and the selected words, a block per paragraph. "units" are the paragraphs, in reading order.
 // A plain textfold:// link (text/uri-list or text/plain) is made into an item from the document's JSON instead.
-import { Doc, DocIndex, isWritten, sectionName, sectionSummary, unitText } from "./doc";
+import { Doc, DocIndex, isWritten, sectionName, sectionText, unitText } from "./doc";
 import { Level, LEVELS, TextFoldLink, buildLink, isPaperId, parseLink } from "./links";
 import { NotesFile, noteLine } from "./notes";
 import { answerMarkdown } from "./notesMarkdown";
@@ -25,6 +28,7 @@ export interface DragItem {
 	authors: string[];
 	citekey?: string;
 	section: { id: string; num: string; title: string } | null;
+	heading?: string; // a section's name as the reader shows it ("2.1 Method"), for a section dragged by its heading
 	kind: string; // note, ask, paragraph, summary, section, selection, chip; "paper" for a link to the whole document
 	level?: Level;
 	lang?: string;
@@ -32,6 +36,7 @@ export interface DragItem {
 	written: boolean; // the text is a model's words
 	quote?: string;
 	comment?: string;
+	units?: string[]; // the paragraphs it covers, in reading order
 	link: TextFoldLink;
 }
 
@@ -61,6 +66,7 @@ export function parseDragJson(text: string): DragItem | null {
 		authors: Array.isArray(o.authors) ? o.authors.filter((a): a is string => typeof a === "string") : [],
 		citekey: str(o.citekey) || undefined,
 		section: s && str(s.id) ? { id: str(s.id), num: str(s.num), title: str(s.title) } : null,
+		heading: str(o.heading).replace(/\s+/g, " ").trim() || undefined,
 		kind: str(o.kind) || "selection",
 		level: (LEVELS as readonly string[]).includes(level) ? (level as Level) : undefined,
 		lang: str(o.lang) || undefined,
@@ -68,6 +74,7 @@ export function parseDragJson(text: string): DragItem | null {
 		written: o.written === true,
 		quote: str(o.quote) || undefined,
 		comment: str(o.comment) || undefined,
+		units: Array.isArray(o.units) ? o.units.filter((u): u is string => typeof u === "string" && /^[\w.-]{1,200}$/.test(u)) : undefined,
 		link,
 	};
 }
@@ -148,19 +155,26 @@ export function itemFromLink(link: TextFoldLink, doc: Doc | null, nf: NotesFile 
 			if (note.text.trim()) item.comment = note.text.trim();
 		}
 	} else if (link.u && index?.unit(link.u)) {
-		const unit = index.unit(link.u);
+		// a paragraph, or a range of them (u=…&to=…): a block per paragraph
+		const units = index.range(link.u, link.to);
 		const lv = level ?? "full";
-		item.kind = "paragraph";
+		const own = (u: (typeof units)[number]) => (lv === "key" ? u.key : lv === "takeaway" ? u.takeaway : lv === "topic" ? u.topic || u.takeaway : "");
+		item.kind = units.length > 1 ? "selection" : "paragraph";
 		item.section = section(index.sectionOf(link.u));
-		item.text = unit ? unitText(unit, lv) : "";
-		const own = unit ? (lv === "key" ? unit.key : lv === "takeaway" ? unit.takeaway : lv === "topic" ? unit.topic || unit.takeaway : "") : "";
-		item.written = !!doc && !doc.local && isWritten(lv) && !!own.trim(); // (an empty level falls back to the full text)
+		item.text = units.map(u => unitText(u, lv)).join("\n\n");
+		item.units = units.map(u => u.id);
+		item.written = !!doc && !doc.local && isWritten(lv) && units.some(u => own(u).trim()); // (an empty level falls back to the full text)
 	} else if (link.s && index?.sections.get(link.s)) {
+		// a section by its heading: its summary and paragraphs, its subsections', as TextFold's reader drags it
 		const s = index.sections.get(link.s)!;
+		const lv = level ?? "takeaway";
+		const st = sectionText(index, s.id, lv);
 		item.kind = "section";
 		item.section = section(s);
-		item.text = sectionSummary(s, level ?? "takeaway");
-		item.written = !!item.text && !doc?.local;
+		item.heading = st?.heading || undefined;
+		item.text = st?.text ?? "";
+		item.units = st?.units;
+		item.written = !!item.text && !doc?.local && isWritten(lv);
 	} else if (doc) {
 		item.text = [doc.authors.slice(0, 4).join("; ") + (doc.authors.length > 4 ? " et al." : ""), doc.date].filter(Boolean).join(" · ");
 	}
@@ -172,9 +186,9 @@ export function shortTitle(title: string): string {
 	return /^(.{3,}?)\s*[:–—]\s+\S/.exec(title)?.[1] ?? title;
 }
 
-/** "Short title › 3 Results", the item's place in one line. */
+/** "Short title › 3 Results", the item's place in one line: a section dragged by its heading named by that heading. */
 export function itemLabel(item: DragItem): string {
-	const s = item.section ? sectionName({ ...item.section, depth: 1, takeaway: "", topic: "", units: [] }) : "";
+	const s = item.heading || (item.section ? sectionName({ ...item.section, depth: 1, takeaway: "", topic: "", units: [] }) : "");
 	return [shortTitle(item.title), s].filter(Boolean).join(" › ").replace(/\s+/g, " ").trim();
 }
 
@@ -196,7 +210,13 @@ export function formatItem(item: DragItem, mode: DropMode): string {
 	const label = itemLabel(item).replace(/([[\]])/g, "\\$1") || item.paper;
 	const icon = `[${ICON_LABEL}](${link})`;
 	if (mode === "link") return `[${label}](${link})`;
-	if (mode === "icon") return `${itemSentence(item) || label} ${icon}`;
+	const heading = item.heading ? `**${safeText(item.heading, item.paper, false).replace(/\*/g, "\\*")}**` : "";
+	if (mode === "icon") {
+		// several lines (a section, a selection over paragraphs): a bold heading line, then the lines as they came
+		const lines = multiLine(item) ? itemParts(item).map(p => p.md).join("\n\n") : "";
+		if (lines) return `${heading ? `${heading}\n` : ""}${lines} ${icon}`;
+		return `${itemSentence(item) || label} ${icon}`;
+	}
 	const parts = itemParts(item);
 	const written = item.written && parts.some(p => p.written);
 	const body: string[] = [];
@@ -205,6 +225,7 @@ export function formatItem(item: DragItem, mode: DropMode): string {
 		body.push(...quoted(p.md));
 	}
 	if (mode === "quote") {
+		if (heading && body.length) body.unshift(`> ${heading}`); // a section's heading, as the callout's title has it
 		if (!body.length) body.push(`> ${label}`);
 		body[body.length - 1] += `${written ? " *(written by the model)*" : ""} ${icon}`;
 		return body.join("\n");
@@ -213,6 +234,11 @@ export function formatItem(item: DragItem, mode: DropMode): string {
 	if (!body.length) return `${head} ${icon}`;
 	body[body.length - 1] += ` ${icon}`;
 	return [head, ...body].join("\n");
+}
+
+/** Whether an item reads as several lines (a section, a selection over paragraphs, a list), not as one sentence. */
+export function multiLine(item: DragItem): boolean {
+	return item.kind !== "note" && item.kind !== "ask" && (!!item.heading || /\n/.test((item.text || item.quote || "").trim()));
 }
 
 /** What was dragged as it reads, on one line: a paragraph, summary, section, selection or chip as shown; a note's
@@ -257,11 +283,13 @@ export function toDragJson(item: DragItem): string {
 		authors: item.authors,
 		...(item.citekey ? { citekey: item.citekey } : {}),
 		section: item.section,
+		...(item.heading ? { heading: item.heading } : {}),
 		kind: item.kind,
 		level: item.level ?? null,
 		lang: item.lang ?? null,
 		text: item.text,
 		written: item.written,
+		...(item.units?.length ? { units: item.units } : {}),
 		...(item.quote ? { quote: item.quote } : {}),
 		...(item.comment ? { comment: item.comment } : {}),
 		link: buildLink(item.link),

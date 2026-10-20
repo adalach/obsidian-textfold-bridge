@@ -13,6 +13,14 @@ describe("parseLink", () => {
 		expect(parseLink("textfold://open?paper=x1&s=bad%20id")).toEqual({ paper: "x1" });
 	});
 
+	it("reads a range of paragraphs, to= only with u=", () => {
+		expect(parseLink("textfold://open?paper=2602.07369&u=S1.p2&to=S1.p5.1&level=takeaway")).toEqual({ paper: "2602.07369", u: "S1.p2", to: "S1.p5.1", level: "takeaway" });
+		expect(parseLink("textfold://open?paper=x1&to=S1.p5")).toEqual({ paper: "x1" });
+		expect(parseLink("textfold://open?paper=x1&s=S1&to=S1.p5")).toEqual({ paper: "x1", s: "S1" });
+		expect(parseLink("textfold://open?paper=x1&u=S1.p2&to=bad%20id")).toEqual({ paper: "x1", u: "S1.p2" });
+		expect(parseLink("textfold://open?paper=x1&u=S1.p2&to=S1.p2")).toEqual({ paper: "x1", u: "S1.p2" });
+	});
+
 	it("needs only the document", () => {
 		expect(parseLink("textfold://open?paper=pdf-357ae69fe0759131")).toEqual({ paper: "pdf-357ae69fe0759131" });
 	});
@@ -44,6 +52,13 @@ describe("buildLink", () => {
 			.toBe("textfold://open?paper=2605.00089&u=S1.p2&n=n-1&level=brief&lang=zh");
 	});
 
+	it("writes a range after its first paragraph, and only with it", () => {
+		expect(buildLink({ paper: "2602.07369", u: "S1.p2", to: "S1.p5.1", level: "takeaway" })).toBe("textfold://open?paper=2602.07369&u=S1.p2&to=S1.p5.1&level=takeaway");
+		expect(buildLink({ paper: "2602.07369", to: "S1.p5.1" })).toBe("textfold://open?paper=2602.07369");
+		const l = "textfold://open?paper=2602.07369&u=S1.p2&to=S1.p5.1&level=key";
+		expect(buildLink(parseLink(l)!)).toBe(l);
+	});
+
 	it("puts a section after the document", () => {
 		expect(buildLink({ paper: "x1", u: "u6", s: "sec-introduction" })).toBe("textfold://open?paper=x1&s=sec-introduction&u=u6");
 		expect(readerUrl("http://127.0.0.1:31917", { paper: "x1", s: "S3", level: "takeaway" })).toBe("http://127.0.0.1:31917/p/x1#s=S3&level=takeaway");
@@ -64,6 +79,10 @@ describe("readerUrl", () => {
 
 	it("opens the document", () => {
 		expect(readerUrl(base, { paper: "pdf-357ae69fe0759131" })).toBe("http://127.0.0.1:3017/p/pdf-357ae69fe0759131");
+	});
+
+	it("puts a range's last paragraph next to its first", () => {
+		expect(readerUrl(base, { paper: "2602.07369", u: "S1.p2", to: "S1.p5.1", level: "full", lang: "en" })).toBe("http://127.0.0.1:3017/p/2602.07369?lang=en#u=S1.p2&to=S1.p5.1&level=full");
 	});
 
 	it("puts the language in the query and the place in the hash", () => {

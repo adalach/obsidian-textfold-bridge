@@ -1,8 +1,8 @@
 // textfold:// links: parse and build them, map them to TextFold's reader URL, and find the documents a note refers to.
 // Pure functions without runtime imports from obsidian, so test/links.test.ts can run them in Node.
 //
-//   textfold://open?paper=<document id>[&u=<paragraph id>][&n=<note id>][&level=<full|brief|key|takeaway|topic>][&lang=<code>]
-//   -> <server>/p/<id>?lang=<code>#n=<note id>&u=<paragraph id>&level=<name>
+//   textfold://open?paper=<document id>[&s=<section id>][&u=<paragraph id>][&n=<note id>][&level=<full|brief|key|takeaway|topic>][&lang=<code>]
+//   -> <server>/p/<id>?lang=<code>#n=<note id>&u=<paragraph id>&s=<section id>&level=<name>
 
 export const LEVELS = ["full", "brief", "key", "takeaway", "topic"] as const;
 export type Level = (typeof LEVELS)[number];
@@ -14,6 +14,7 @@ export function levelName(n: unknown): Level | undefined {
 
 export interface TextFoldLink {
 	paper: string;
+	s?: string; // section id, such as S3 or sec-introduction
 	u?: string; // paragraph (unit) id, such as S2.SS3.p2
 	n?: string; // note id, such as n-k3f9a2qx
 	level?: Level;
@@ -38,8 +39,11 @@ export function parseLink(href: string): TextFoldLink | null {
 	const paper = q.get("paper") ?? "";
 	if (!isPaperId(paper)) return null;
 	const link: TextFoldLink = { paper };
-	const u = q.get("u");
-	if (u && u.length <= 200 && !/[\s#&]/.test(u)) link.u = u;
+	const place = (v: string | null) => (v && v.length <= 200 && !/[\s#&]/.test(v) ? v : undefined);
+	const sec = place(q.get("s"));
+	if (sec) link.s = sec;
+	const u = place(q.get("u"));
+	if (u) link.u = u;
 	const n = q.get("n");
 	if (n && NOTE_ID.test(n)) link.n = n;
 	const level = q.get("level")?.toLowerCase();
@@ -52,6 +56,7 @@ export function parseLink(href: string): TextFoldLink | null {
 /** The textfold:// link for a document, a paragraph or a note in it. */
 export function buildLink(link: TextFoldLink): string {
 	const parts = [`paper=${encodeURIComponent(link.paper)}`];
+	if (link.s) parts.push(`s=${encodeURIComponent(link.s)}`);
 	if (link.u) parts.push(`u=${encodeURIComponent(link.u)}`);
 	if (link.n) parts.push(`n=${encodeURIComponent(link.n)}`);
 	if (link.level) parts.push(`level=${link.level}`);
@@ -59,14 +64,15 @@ export function buildLink(link: TextFoldLink): string {
 	return `textfold://open?${parts.join("&")}`;
 }
 
-/** The reader URL on a running TextFold server (base such as http://127.0.0.1:3017). The reader reads #n=, #u= and
- *  #level= each on its own; with both a note and a paragraph, the paragraph is where it goes when the note is gone. */
+/** The reader URL on a running TextFold server (base such as http://127.0.0.1:3017). The reader reads #n=, #u=, #s=
+ *  and #level= each on its own; with both a note and a paragraph, the paragraph is where it goes when the note is gone. */
 export function readerUrl(base: string, link: TextFoldLink): string {
 	let url = `${base.replace(/\/+$/, "")}/p/${encodeURIComponent(link.paper)}`;
 	if (link.lang) url += `?lang=${encodeURIComponent(link.lang)}`;
 	const hash: string[] = [];
 	if (link.n) hash.push(`n=${encodeURIComponent(link.n)}`);
 	if (link.u) hash.push(`u=${encodeURIComponent(link.u)}`);
+	if (link.s) hash.push(`s=${encodeURIComponent(link.s)}`);
 	if (link.level) hash.push(`level=${link.level}`);
 	return hash.length ? `${url}#${hash.join("&")}` : url;
 }

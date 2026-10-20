@@ -1,6 +1,7 @@
 // Settings: where TextFold is, where a textfold:// link opens, its hover previews, the language a note is folded in,
 // and where imported notes go.
 import { App, PluginSettingTab, Setting, SettingDefinitionItem, debounce } from "obsidian";
+import type { DropMode } from "./drag";
 import type TextFoldBridgePlugin from "./main";
 import { DEFAULT_URL, Resolved, loopbackUrl } from "./server";
 
@@ -10,6 +11,7 @@ export interface BridgeSettings {
 	sourceFolder: string; // a clone of TextFold, whose server writes server.json there; also looked in by Automatic
 	openIn: "browser" | "app"; // browser: the reader page on the running server; app: textfold:// for TextFold to open
 	hoverPreviews: boolean;
+	dropAs: DropMode; // what a TextFold item dropped or pasted into a note becomes
 	foldLang: string; // the language "Fold this note" folds in
 	importFolder: string;
 	importNames: "title" | "citekey";
@@ -21,6 +23,7 @@ export const DEFAULT_SETTINGS: BridgeSettings = {
 	sourceFolder: "",
 	openIn: "browser",
 	hoverPreviews: true,
+	dropAs: "callout",
 	foldLang: "en",
 	importFolder: "TextFold",
 	importNames: "title",
@@ -104,6 +107,17 @@ export class BridgeSettingTab extends PluginSettingTab {
 			},
 			{
 				type: "group",
+				heading: "Drops from TextFold",
+				items: [
+					{
+						name: "Dropped TextFold items as",
+						desc: "What a paragraph, note or selection dragged or pasted from TextFold (or from the sidebar) becomes in a note: a callout with its text and link, a quote with the link, or the link alone.",
+						control: { type: "dropdown", key: "dropAs", defaultValue: DEFAULT_SETTINGS.dropAs, options: { callout: "Callout", quote: "Quote with the link", link: "Link only" } },
+					},
+				],
+			},
+			{
+				type: "group",
 				heading: "Fold this note",
 				items: [
 					{
@@ -150,6 +164,7 @@ export class BridgeSettingTab extends PluginSettingTab {
 		else if (key === "sourceFolder") s.sourceFolder = text;
 		else if (key === "openIn") s.openIn = value === "app" ? "app" : "browser";
 		else if (key === "hoverPreviews") s.hoverPreviews = value === true;
+		else if (key === "dropAs") s.dropAs = value === "quote" || value === "link" ? value : "callout";
 		else if (key === "foldLang") s.foldLang = text || DEFAULT_SETTINGS.foldLang;
 		else if (key === "importFolder") s.importFolder = text || DEFAULT_SETTINGS.importFolder;
 		else if (key === "importNames") s.importNames = value === "citekey" ? "citekey" : "title";

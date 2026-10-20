@@ -8,6 +8,11 @@ describe("parseLink", () => {
 		});
 	});
 
+	it("reads a section", () => {
+		expect(parseLink("textfold://open?paper=2605.00089&s=S3&level=topic")).toEqual({ paper: "2605.00089", s: "S3", level: "topic" });
+		expect(parseLink("textfold://open?paper=x1&s=bad%20id")).toEqual({ paper: "x1" });
+	});
+
 	it("needs only the document", () => {
 		expect(parseLink("textfold://open?paper=pdf-357ae69fe0759131")).toEqual({ paper: "pdf-357ae69fe0759131" });
 	});
@@ -37,6 +42,11 @@ describe("buildLink", () => {
 	it("writes the parts in the contract's order", () => {
 		expect(buildLink({ paper: "2605.00089", lang: "zh", level: "brief", n: "n-1", u: "S1.p2" }))
 			.toBe("textfold://open?paper=2605.00089&u=S1.p2&n=n-1&level=brief&lang=zh");
+	});
+
+	it("puts a section after the document", () => {
+		expect(buildLink({ paper: "x1", u: "u6", s: "sec-introduction" })).toBe("textfold://open?paper=x1&s=sec-introduction&u=u6");
+		expect(readerUrl("http://127.0.0.1:31917", { paper: "x1", s: "S3", level: "takeaway" })).toBe("http://127.0.0.1:31917/p/x1#s=S3&level=takeaway");
 	});
 
 	it("round-trips through parseLink", () => {

@@ -5,9 +5,10 @@
 import { EditorView } from "@codemirror/view";
 import { Component, HoverParent, HoverPopover, Keymap, MarkdownRenderer, Plugin, setIcon } from "obsidian";
 import type { TextFoldClient } from "./client";
-import { DocIndex, sectionName, unitText } from "./doc";
+import { DocIndex, sectionName, sectionSummary, unitText } from "./doc";
 import { Level, TextFoldLink, parseLink } from "./links";
 import { NotesFile, Paper, noteLine } from "./notes";
+import { missingPaper } from "./opener";
 
 const WAIT_MS = 300;
 const NOTES_MS = 30_000; // a document's notes change as one reads: asked again after this long
@@ -19,7 +20,6 @@ const MD_LINK = /\[((?:\\.|[^\]\\])*)\]\((textfold:\/\/open\/?\?[^)\s]*)\)/gi;
 export class LinkPreviews {
 	private alive = new WeakMap<HTMLElement, number>(); // target -> when its popover was made
 	private notes = new Map<string, { at: number; file: Promise<NotesFile | null> }>();
-	private papers: Promise<Paper[]> | null = null;
 
 	constructor(private plugin: Plugin, private client: TextFoldClient, private enabled: () => boolean) {}
 
@@ -31,7 +31,6 @@ export class LinkPreviews {
 	/** Forget cached notes and titles (refresh, a refold). */
 	forget(): void {
 		this.notes.clear();
-		this.papers = null;
 	}
 
 	private onMouseOver(evt: MouseEvent): void {
@@ -84,8 +83,13 @@ export class LinkPreviews {
 		if (!r.reachable) throw new Error(`TextFold is not reachable at ${r.url}.`);
 		const doc = await this.client.doc(link.paper, link.lang).catch(() => null);
 		const index = doc ? new DocIndex(doc) : null;
-		const title = doc?.title || (await this.paper(link.paper))?.title || link.paper;
+		const known = doc ? undefined : await this.paper(link.paper);
 		body.empty();
+		if (!doc && !known) {
+			body.createDiv({ cls: "tfb-hover-text", text: missingPaper(link.paper) });
+			return;
+		}
+		const title = doc?.title || known?.title || link.paper;
 		const meta = body.createDiv("tfb-hover-meta");
 		const head = [shortTitle(title)];
 
@@ -108,6 +112,24 @@ export class LinkPreviews {
 				if (turn.takeaway) body.createDiv({ cls: "tfb-hover-text", text: `→ ${turn.takeaway}` });
 			}
 			if (!note.quote && !note.text && !turn) body.createDiv({ cls: "tfb-hover-text", text: noteLine(note) });
+			return;
+		}
+
+		if (link.s && !link.u) {
+			const s = index?.sections.get(link.s);
+			const level: Level = link.level ?? "takeaway";
+			if (s) head.push(sectionName(s) || "Opening");
+			head.push(LEVEL_NAME[level]);
+			meta.setText(head.join(" · "));
+			if (!s) {
+				body.createDiv({ cls: "tfb-hover-text", text: doc ? "This section is not in the document any more." : `Section ${link.s}.` });
+				return;
+			}
+			const summary = sectionSummary(s, level);
+			if (s.title) body.createDiv({ cls: "tfb-hover-title", text: sectionName(s) });
+			const text = body.createDiv("tfb-hover-text markdown-rendered");
+			if (summary) await MarkdownRenderer.render(this.plugin.app, summary.replace(/\[\[/g, "\\[\\["), text, "", owner);
+			else text.setText(`${plural(s.units.length, "paragraph")}; no summary yet.`);
 			return;
 		}
 
@@ -147,9 +169,7 @@ export class LinkPreviews {
 	}
 
 	private async paper(id: string): Promise<Paper | undefined> {
-		this.papers ??= this.client.papers();
-		this.papers.catch(() => (this.papers = null));
-		return (await this.papers.catch(() => [])).find(p => p.id === id);
+		return this.client.paperInfo(id).catch(() => undefined);
 	}
 }
 
@@ -157,6 +177,10 @@ export function lostLine(el: HTMLElement): void {
 	const line = el.createDiv("tfb-lost-line");
 	setIcon(line.createSpan("tfb-lost-icon"), "alert-triangle");
 	line.createSpan({ text: "Passage not found after the edit" });
+}
+
+function plural(n: number, word: string): string {
+	return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
 
 function shortTitle(title: string): string {

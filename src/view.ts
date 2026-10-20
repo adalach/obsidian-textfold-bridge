@@ -6,9 +6,11 @@
 import { Component, ItemView, MarkdownRenderer, MarkdownView, Notice, TFile, WorkspaceLeaf, debounce, setIcon, setTooltip } from "obsidian";
 import { TextFoldError } from "./client";
 import { Doc, DocIndex, sectionName } from "./doc";
+import { itemFromLink, setTransfer } from "./drag";
 import { FoldRecord, FoldState } from "./fold";
 import { lostLine } from "./hover";
 import { TextFoldLink, findPaperIds, markdownLink } from "./links";
+import { missingPaper } from "./opener";
 import type TextFoldBridgePlugin from "./main";
 import { Note, NotesFile, citationLinks, noteLine, noteLink } from "./notes";
 import { WHOLE, groupNotes } from "./notesMarkdown";
@@ -196,9 +198,10 @@ export class TextFoldNotesView extends ItemView {
 			const missing = reachable && !item.file;
 			if (missing || !reachable) row.addClass("tfb-muted");
 			const tip = [title !== item.id ? `${title}\n${item.id}` : item.id];
-			if (missing) tip.push(item.error ?? "TextFold has no document with this id.");
+			if (missing) tip.push(item.error ?? missingPaper(item.id));
 			setTooltip(row, tip.join("\n"), { placement: "left" });
-			this.actions(row, { paper: item.id }, title, item.file ? item.id : undefined);
+			this.actions(row, { paper: item.id }, title, item.file ? item.id : undefined, missing ? missingPaper(item.id) : undefined);
+			if (item.file) this.draggable(row, item, { paper: item.id });
 			row.addEventListener("click", () => {
 				if (!count) return;
 				if (open) this.collapsed.add(item.id);
@@ -226,6 +229,7 @@ export class TextFoldNotesView extends ItemView {
 		}
 		const link = noteLink(item.id, note);
 		this.actions(row, link, line);
+		this.draggable(row, item, link);
 		row.addEventListener("click", () => void this.plugin.opener.open(link));
 		const s = index?.sectionOf(note.unit, note.section);
 		const section = note.on === "paper" ? WHOLE : s ? sectionName(s) : "";
@@ -274,9 +278,20 @@ export class TextFoldNotesView extends ItemView {
 		}
 	}
 
+	/** A row dragged into a note goes in as a dropped TextFold item does (drop.ts), with the same data. */
+	private draggable(row: HTMLElement, item: Item, link: TextFoldLink): void {
+		row.draggable = true;
+		row.addEventListener("dragstart", e => {
+			if (!e.dataTransfer) return;
+			this.card?.hide();
+			setTransfer(e.dataTransfer, itemFromLink(link, item.doc, item.file));
+			e.dataTransfer.effectAllowed = "copy";
+		});
+	}
+
 	/** Open in TextFold, Copy link, Insert link at the cursor, and for a document Import: icons at the row's right
-	 *  edge, shown on hover. */
-	private actions(row: HTMLElement, link: TextFoldLink, label: string, importId?: string): void {
+	 *  edge, shown on hover. For a document the running TextFold does not have, Open says so instead. */
+	private actions(row: HTMLElement, link: TextFoldLink, label: string, importId?: string, missing?: string): void {
 		const box = row.createDiv("tfb-actions");
 		const add = (icon: string, tip: string, fn: () => void) => {
 			const b = box.createDiv({ cls: "clickable-icon tfb-icon", attr: { "aria-label": tip } });
@@ -286,7 +301,8 @@ export class TextFoldNotesView extends ItemView {
 				fn();
 			});
 		};
-		add("external-link", "Open in TextFold", () => void this.plugin.opener.open(link));
+		if (missing) add("external-link", missing, () => new Notice(missing, 8000));
+		else add("external-link", "Open in TextFold", () => void this.plugin.opener.open(link));
 		add("copy", "Copy link", () => void this.copy(markdownLink(label, link)));
 		add("text-cursor-input", "Insert link at the cursor", () => this.insert(markdownLink(truncate(label, 80), link)));
 		if (importId) add("download", "Import its notes into the vault", () => void this.plugin.importer.importPapers([importId]));

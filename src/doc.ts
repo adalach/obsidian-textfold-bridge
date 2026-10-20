@@ -18,7 +18,8 @@ export interface DocSection {
 	num: string;
 	title: string;
 	depth: number;
-	takeaway: string;
+	takeaway: string; // the section's summary, written by the model
+	topic: string;
 	units: DocUnit[];
 }
 
@@ -56,6 +57,7 @@ export function parseDoc(data: unknown): Doc | null {
 				title: str(c.title),
 				depth: typeof c.depth === "number" ? c.depth : 1,
 				takeaway: str(c.takeaway),
+				topic: str(c.topic),
 				units: (Array.isArray(c.units) ? c.units : []).map((u): DocUnit => {
 					const x = obj(u);
 					return { id: str(x.id), kind: str(x.kind), full: str(x.full), brief: strs(x.brief), key: str(x.key), takeaway: str(x.takeaway), topic: str(x.topic) };
@@ -76,6 +78,16 @@ export function sectionName(s: DocSection): string {
 export function unitText(u: DocUnit, level: Level): string {
 	const text = level === "full" ? u.full : level === "brief" ? u.brief.join(" ") : level === "key" ? u.key : level === "takeaway" ? u.takeaway : u.topic || u.takeaway;
 	return text.trim() || u.full;
+}
+
+/** A section's summary at a level: its topic at Topic, else its takeaway; "" when no model has written one. */
+export function sectionSummary(s: DocSection, level: Level): string {
+	return (level === "topic" ? s.topic || s.takeaway : s.takeaway).trim();
+}
+
+/** Whether a level's text is a model's words (Key, Takeaway, Topic) rather than the author's (Full, Brief). */
+export function isWritten(level: Level): boolean {
+	return level === "key" || level === "takeaway" || level === "topic";
 }
 
 /** Where things are in a document: each unit's section and place in reading order. */

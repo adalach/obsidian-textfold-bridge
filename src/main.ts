@@ -1,8 +1,10 @@
 // TextFold Bridge: wiring only. TextFold keeps the papers and everything written on them; Obsidian keeps
 // textfold:// links in notes (with hover previews), a sidebar with TextFold's notes for the open note, a picker that
-// inserts a link, "Fold this note" to read a note in TextFold, and "Import notes" to bring TextFold's notes into the vault.
+// inserts a link, items dragged in from TextFold, "Fold this note" to read a note in TextFold, and "Import notes" to
+// bring TextFold's notes into the vault.
 import { Notice, Plugin, TFile } from "obsidian";
 import { TextFoldClient } from "./client";
+import { Drops } from "./drop";
 import { FoldRecord, Folds } from "./fold";
 import { LinkPreviews } from "./hover";
 import { ImportPicker, Importer } from "./importer";
@@ -33,6 +35,7 @@ export default class TextFoldBridgePlugin extends Plugin {
 		this.previews.install(fn => listenDocuments(this, fn));
 		this.folds = new Folds(this.app, this.client, () => this.folded, () => this.saveSettings(), () => this.settings.foldLang);
 		this.register(() => this.folds.stop());
+		new Drops(this, this.client, () => this.settings.dropAs).install();
 		this.importer = new Importer(this.app, this.client, () => ({ folder: this.settings.importFolder, byCitekey: this.settings.importNames === "citekey" }));
 
 		this.registerView(VIEW_TYPE, leaf => new TextFoldNotesView(leaf, this));

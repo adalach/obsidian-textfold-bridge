@@ -32,6 +32,7 @@ const PROBE_MS = 2500;
 const READ_MS = 8000;
 const WRITE_MS = 30_000; // a long note takes TextFold a moment to parse
 const FRESH_MS = 60_000; // an address that answered is used this long without asking again
+const PAPERS_MS = 30_000;
 
 type Reply = { status: number; text: string };
 
@@ -41,6 +42,7 @@ export class TextFoldClient {
 	private checking: Promise<Resolved> | null = null;
 	private listeners = new Set<(state: Resolved | null) => void>();
 	private docs = new Map<string, Promise<Doc | null>>(); // per session: a document's text changes only when refolded
+	private paperList: { at: number; list: Promise<Paper[]> } | null = null;
 
 	constructor(private address: () => Address) {}
 
@@ -58,6 +60,7 @@ export class TextFoldClient {
 	reset(): void {
 		this.resolved = null;
 		this.docs.clear();
+		this.paperList = null;
 		this.emit();
 	}
 
@@ -89,6 +92,18 @@ export class TextFoldClient {
 
 	async papers(): Promise<Paper[]> {
 		return parsePapers(await this.getJson("/api/papers"));
+	}
+
+	/** A document as /api/papers lists it, or undefined when TextFold has none with this id. The list is kept for
+	 *  half a minute, so checking every link opened costs one request now and then. */
+	async paperInfo(id: string): Promise<Paper | undefined> {
+		const hit = this.paperList;
+		if (!hit || Date.now() - hit.at > PAPERS_MS) {
+			const list = this.papers();
+			this.paperList = { at: Date.now(), list };
+			list.catch(() => (this.paperList = null));
+		}
+		return (await this.paperList!.list).find(p => p.id === id);
 	}
 
 	/** A document's notes, or null when TextFold has no document with this id. */

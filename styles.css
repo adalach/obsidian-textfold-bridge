@@ -269,3 +269,16 @@
 .tfb-hover-text > p {
 	margin: 2px 0;
 }
+
+/* an item dropped from TextFold: > [!textfold] Title › Section; [!textfold|written] when its text is a model's words */
+.callout[data-callout="textfold"] {
+	--callout-color: var(--color-cyan-rgb);
+	--callout-icon: lucide-book-open-text;
+}
+
+.callout[data-callout="textfold"][data-callout-metadata~="written"] .callout-title-inner::after {
+	content: " · written by the model";
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+	font-weight: var(--font-normal);
+}

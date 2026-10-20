@@ -55,24 +55,44 @@ export class LinkOpener {
 		void this.open(href);
 	}
 
-	/** Open a textfold:// link (or its parts): in TextFold's app, or on the reader page of the running server. */
+	/** Open a textfold:// link (or its parts): in TextFold's app, or on the reader page of the running server. A
+	 *  document the running TextFold does not have is not opened (TextFold would show its home screen instead): a
+	 *  notice says so. With TextFold not running, the app opens the link anyway, which starts it. */
 	async open(target: string | TextFoldLink): Promise<void> {
 		const link = typeof target === "string" ? parseLink(target) : target;
 		if (!link) {
 			new Notice("This textfold:// link names no TextFold document.");
 			return;
 		}
+		const r = await this.client.server();
+		if (r.reachable && !(await this.has(link.paper))) {
+			new Notice(missingPaper(link.paper), 8000);
+			return;
+		}
 		if (this.openIn() === "app") {
 			this.nativeOpen(buildLink(link));
 			return;
 		}
-		const r = await this.client.server();
 		if (!r.reachable) {
 			new Notice(`TextFold is not running at ${r.url}. Start TextFold, then open the link again.`);
 			return;
 		}
 		this.nativeOpen(readerUrl(r.url, link), "_external"); // the system browser, not Obsidian's web viewer
 	}
+
+	/** Whether the running TextFold has the document; true when it cannot tell (the link opens as before). */
+	private async has(paper: string): Promise<boolean> {
+		try {
+			return (await this.client.paperInfo(paper)) !== undefined;
+		} catch {
+			return true;
+		}
+	}
+}
+
+/** The notice for a link to a document the running TextFold does not have. */
+export function missingPaper(paper: string): string {
+	return `TextFold has no document ${paper}. It may be in another TextFold library, or deleted.`;
 }
 
 /** Run fn once for the main window's document and for every pop-out window's, now and when one opens. */

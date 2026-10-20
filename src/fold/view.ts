@@ -605,7 +605,8 @@ export class FoldView extends FileView {
 		if (!pcs.length) return;
 		const { row, gut, txt, mar } = this.row(`tfb-u${level !== "full" ? " tfb-folded" : ""}${unf ? " tfb-unf" : ""}${u.kind === "caption" ? " tfb-cap" : ""}`, u.id);
 		row.dataset.u = u.id;
-		if (u.role) gut.appendChild(piece({ id: `${u.id}:role`, t: ROLE[u.role] ?? u.role }, `tfb-role tfb-r-${u.role}`));
+		// a known rhetorical role only (a translated document has "para", "caption" …, its units' kinds)
+		if (ROLE[u.role]) gut.appendChild(piece({ id: `${u.id}:role`, t: ROLE[u.role] }, `tfb-role tfb-r-${u.role}`));
 		if (unf) gut.createSpan({ cls: "tfb-full-tag", text: "Full" });
 		if (n(level) >= 3 && !unf) txt.addClass("tfb-ai");
 		const fill = () => {

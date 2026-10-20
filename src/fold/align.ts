@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0. Adapted from TextFold, Copyright 2026 Xia Chen; changed for this plugin (see NOTICE).
 // Words and levels of a folded note: every word gets an id that persists across the five levels, so a level change can
 // slide each word from where it was to where it is. Adapted from TextFold's reader (textfold/web/reader.js) and its word
 // alignment (textfold/tokens.py, textfold/ladder.py), Apache License 2.0, by way of the design mockup: the model's words

@@ -1,0 +1,19 @@
+TextFold Bridge
+Copyright 2026 Agata Dalach
+
+The plugin is under the MIT License (LICENSE), except two files of its fold view, which are adapted from TextFold
+and stay under the Apache License, Version 2.0 (LICENSE-APACHE-2.0):
+
+- src/fold/align.ts: the words of each level and their ids, from TextFold's reader (textfold/web/reader.js) and its
+  word alignment (textfold/tokens.py, textfold/ladder.py), rewritten in TypeScript;
+- src/fold/motion.ts: the words travelling between levels, from TextFold's reader (textfold/web/reader.js),
+  rewritten in TypeScript for Obsidian's views.
+
+TextFold's notice:
+
+  TextFold (formerly PaperFold)
+  Copyright 2026 Xia Chen
+
+  This product includes software developed by Xia Chen
+  (https://github.com/chenxiachan/textfold), licensed under the Apache License,
+  Version 2.0 (see LICENSE).

@@ -117,6 +117,16 @@ export function mapUnits(blocks: NoteBlock[], doc: Doc): FoldMap {
 	// paragraphs: each in the first block from where the last one was that holds most of its words
 	let at = 0;
 	for (const u of doc.sections.flatMap(s => s.units)) {
+		// a picture's caption (TextFold's words for it, when the note gave none): the next picture of the note
+		if (u.kind === "caption") {
+			const i = blocks.findIndex(b => b.index >= at && b.index < at + LOOKAHEAD && isPicture(b.markdown) && !map.blockUnits.has(b.index));
+			if (i >= 0) {
+				map.unitBlock.set(u.id, i);
+				map.blockUnits.set(i, [u.id]);
+				at = i + 1;
+				continue;
+			}
+		}
 		const want = wordsOf(u.full);
 		if (!want.length) continue;
 		for (let i = at; i < blocks.length && i < at + LOOKAHEAD; i++) {
@@ -129,6 +139,18 @@ export function mapUnits(blocks: NoteBlock[], doc: Doc): FoldMap {
 		}
 	}
 	return map;
+}
+
+/** The share of TextFold's text paragraphs (captions aside) found in the note's blocks: low when the document is a
+ *  translation, or folded in another language than the note's. A document without text counts as the note's own. */
+export function mappedShare(map: FoldMap, doc: Doc): number {
+	const text = doc.sections.flatMap(s => s.units).filter(u => u.kind !== "caption" && u.full.trim());
+	return text.length ? text.filter(u => map.unitBlock.has(u.id)).length / text.length : 1;
+}
+
+/** A block that is only a picture: an embed or a Markdown image. */
+function isPicture(markdown: string): boolean {
+	return /^(?:!\[\[[^\]]+\]\]|!\[[^\]]*\]\([^)]+\))$/.test(markdown.trim());
 }
 
 /** How many of `want`'s words the block has, as a share of them (each word of the block counted once). */

@@ -52,6 +52,13 @@ export default class TextFoldBridgePlugin extends Plugin {
 		this.registerView(VIEW_TYPE, leaf => new TextFoldNotesView(leaf, this));
 		this.registerView(FOLD_VIEW, leaf => new FoldView(leaf, this));
 		this.app.workspace.onLayoutReady(() => void this.learnLanguages());
+		// and again whenever TextFold is found (it may start after Obsidian, or at another address)
+		let learnt = "";
+		this.register(this.client.onChange(state => {
+			if (!state?.reachable || state.url === learnt) return;
+			learnt = state.url;
+			void this.learnLanguages();
+		}));
 		this.addSettingTab(new BridgeSettingTab(this.app, this));
 
 		this.addCommand({

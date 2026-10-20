@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: Apache-2.0. Adapted from TextFold, Copyright 2026 Xia Chen; changed for this plugin (see NOTICE).
 // Words travelling between levels, as in TextFold's reader (textfold/web/reader.js, Apache License 2.0) and the design
 // mockup: measure every word near the viewport, re-render at the new level, then slide each word that is still there
 // from where it was (FLIP), fade in the new ones, and fade out a ghost of each word that left. A key or a button runs

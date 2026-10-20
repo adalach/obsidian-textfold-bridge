@@ -12,7 +12,7 @@ import type { Level } from "../links";
 import type TextFoldBridgePlugin from "../main";
 import { Note, NotesFile, citationLinks, noteLink } from "../notes";
 import { FOLD_LEVELS, LEVEL_LABEL, Piece, PreparedUnit, alignRendered, piecesOf, piecesText, prepSection, prepUnit, tokenize } from "./align";
-import { FoldMap, NoteBlock, mapUnits, splitBlocks } from "./blocks";
+import { FoldMap, NoteBlock, mapUnits, mappedShare, splitBlocks } from "./blocks";
 import { Motion } from "./motion";
 
 export const FOLD_VIEW = "textfold-fold";
@@ -40,6 +40,7 @@ export class FoldView extends FileView {
 	private paper = "";
 	private doc: Doc | null = null;
 	private offline = false;
+	private ownWords = true; // TextFold's paragraphs are the note's own words, so Full shows the note itself (not so for a translation)
 	private map: FoldMap | null = null;
 	private units = new Map<string, PreparedUnit>();
 	private unitDoc = new Map<string, DocUnit>();
@@ -316,6 +317,7 @@ export class FoldView extends FileView {
 			}
 		}
 		if (doc.local && this.level !== "full") this.level = "full";
+		this.ownWords = mappedShare(this.map, doc) >= 0.5;
 	}
 
 	private clearDoc(): void {
@@ -324,6 +326,7 @@ export class FoldView extends FileView {
 		this.units.clear();
 		this.notesBy.clear();
 		this.whole = [];
+		this.ownWords = true;
 	}
 
 	private onFoldChange(): void {
@@ -509,8 +512,8 @@ export class FoldView extends FileView {
 		this.headRow(level);
 		if (this.whole.length) this.wholeRow(level);
 		if (level === "topic") this.topicMap();
-		else if (level === "full") this.fullRows();
-		else this.foldedRows(level);
+		else if (level === "full" && this.ownWords) this.fullRows();
+		else this.foldedRows(level); // (Full of a translation: TextFold's words for it)
 		this.heat();
 	}
 
@@ -529,7 +532,7 @@ export class FoldView extends FileView {
 			const model = doc.model.split("/").slice(-2).join("/") || "TextFold's model";
 			const when = doc.made ? ` on ${doc.made.slice(0, 10)}` : "";
 			const prov = txt.createDiv("tfb-prov");
-			prov.appendText("Full and Brief are your own words. ");
+			prov.appendText(this.ownWords ? "Full and Brief are your own words. " : `Full and Brief are your words in ${langName(this.plugin, doc.lang)}, as the model translated them. `);
 			prov.createEl("em", { text: `Key, Takeaway and Topic were written by ${model}${when}.` });
 			if (n(level) >= 3) prov.appendText(" Hover a written line for the sentences it rests on.");
 		}
@@ -567,7 +570,7 @@ export class FoldView extends FileView {
 				const items = Array.from(el.querySelectorAll<HTMLElement>(":scope > ul > li, :scope > ol > li"));
 				if (items.length === units.length) items.forEach((li, i) => (li.dataset.anchor = units[i]));
 			}
-			if (units.length && !el.dataset.wrapped) this.cold.set(row, () => this.wrap(el, units));
+			if (units.length) this.cold.set(row, () => this.wrap(el, units));
 			for (const u of units) this.comments(mar, u, "full", false);
 		}
 	}
@@ -600,7 +603,7 @@ export class FoldView extends FileView {
 		const unf = this.unf.has(u.id);
 		const pcs = piecesOf(p, level, unf);
 		if (!pcs.length) return;
-		const { row, gut, txt, mar } = this.row(`tfb-u tfb-folded${unf ? " tfb-unf" : ""}${u.kind === "caption" ? " tfb-cap" : ""}`, u.id);
+		const { row, gut, txt, mar } = this.row(`tfb-u${level !== "full" ? " tfb-folded" : ""}${unf ? " tfb-unf" : ""}${u.kind === "caption" ? " tfb-cap" : ""}`, u.id);
 		row.dataset.u = u.id;
 		if (u.role) gut.appendChild(piece({ id: `${u.id}:role`, t: ROLE[u.role] ?? u.role }, `tfb-role tfb-r-${u.role}`));
 		if (unf) gut.createSpan({ cls: "tfb-full-tag", text: "Full" });
@@ -706,7 +709,10 @@ export class FoldView extends FileView {
 
 	/** Wrap a rendered block's words into pieces with the ids of its paragraphs' words (Full ↔ Brief travel). */
 	private wrap(el: HTMLElement, unitIds: string[]): void {
-		if (el.dataset.wrapped) return;
+		if (el.dataset.wrapped) {
+			this.remark(el);
+			return;
+		}
 		el.dataset.wrapped = "1";
 		const tokens: { id: string; t: string; c0: number; c1: number; hl: boolean; lead: boolean }[] = [];
 		for (const id of unitIds) {
@@ -742,6 +748,20 @@ export class FoldView extends FileView {
 			}
 			if (at < text.length) frag.appendText(text.slice(at));
 			node.replaceWith(frag);
+		}
+	}
+
+	/** A rendered paragraph wrapped before (its element is kept while the note is unchanged): its words' marks as the
+	 *  notes and the document now have them. */
+	private remark(el: HTMLElement): void {
+		for (const span of Array.from(el.querySelectorAll<HTMLElement>(".tfb-tk[data-id]"))) {
+			const id = span.dataset.id ?? "";
+			const k = id.lastIndexOf(":");
+			const p = this.units.get(id.slice(0, k));
+			const i = Number(id.slice(k + 1));
+			if (!p || !Number.isInteger(i)) continue;
+			span.toggleClass("tfb-hl", p.hl.has(i));
+			span.toggleClass("tfb-lead", p.ev.some(s => i >= p.sr[s][0] && i < p.sr[s][1]));
 		}
 	}
 

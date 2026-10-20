@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseDoc } from "../src/doc";
 import { alignRendered, lcsPairs, locate, norm, piecesOf, piecesText, prepSection, prepUnit, tokenize } from "../src/fold/align";
-import { mapUnits, plainText, splitBlocks } from "../src/fold/blocks";
+import { mappedShare, mapUnits, plainText, splitBlocks } from "../src/fold/blocks";
 import { FALLBACK_LANGS, foldLanguage, parseLangs, readerLangOf } from "../src/langs";
 
 const unit = {
@@ -111,7 +111,7 @@ describe("the note's blocks and TextFold's paragraphs", () => {
 		"![[plot.png]]",
 	].join("\n");
 	const blocks = splitBlocks(note);
-	const doc = parseDoc({
+	const raw = {
 		format: "textfold/doc", version: 0, id: "md-fold-test-1", title: "Fold test", authors: [], date: "", source: {}, provenance: { local: false, model: "claude/claude-code/sonnet" },
 		sections: [
 			{ id: "abstract", num: "", title: "", depth: 1, units: [{ ...unit }] },
@@ -120,7 +120,8 @@ describe("the note's blocks and TextFold's paragraphs", () => {
 				{ id: "p-22222222", kind: "list item", full: "Then we merge small pieces into zones.", sentences: [], evidence: [], key: "", takeaway: "", topic: "" },
 			] },
 		],
-	})!;
+	};
+	const doc = parseDoc(raw)!;
 
 	it("splits the note by blank lines without the metadata cache, front matter left out", () => {
 		expect(blocks.map(b => b.type)).toEqual(["heading", "paragraph", "heading", "paragraph", "paragraph", "paragraph"]);
@@ -157,6 +158,30 @@ describe("the note's blocks and TextFold's paragraphs", () => {
 		expect(map.unitBlock.get("p-1a2b3c4d")).toBe(1);
 		expect(map.blockUnits.get(3)).toEqual(["p-11111111", "p-22222222"]);
 		expect(map.blockUnits.has(4)).toBe(false);
+		expect(mappedShare(map, doc)).toBe(1);
+	});
+
+	it("tells a translation by its paragraphs not being in the note", () => {
+		const de = parseDoc({ ...raw, lang: "de", sections: [
+			{ id: "abstract", num: "", title: "", depth: 1, units: [{ ...unit, id: "p-1a2b3c4d", full: "Konvexe Zonen halten thermische Modelle einfach.", sentences: [] }] },
+		] })!;
+		expect(mappedShare(mapUnits(blocks, de), de)).toBe(0);
+	});
+});
+
+describe("a picture's caption", () => {
+	it("goes with the note's next picture", () => {
+		const note = "## Light\n\nShelves bounce daylight onto the ceiling.\n\n![[shelf.png]]\n\nIt spreads further from the window.";
+		const doc = parseDoc({
+			format: "textfold/doc", version: 0, id: "md-pic-1", title: "Pic", authors: [], date: "", source: {}, provenance: {},
+			sections: [{ id: "sec-light", num: "", title: "Light", depth: 1, units: [
+				{ id: "p-1", kind: "paragraph", full: "Shelves bounce daylight onto the ceiling.", sentences: [], evidence: [], key: "", takeaway: "", topic: "" },
+				{ id: "p-2", kind: "caption", full: "A shelf below a high window.", sentences: [], evidence: [], key: "", takeaway: "", topic: "" },
+				{ id: "p-3", kind: "paragraph", full: "It spreads further from the window.", sentences: [], evidence: [], key: "", takeaway: "", topic: "" },
+			] }],
+		})!;
+		const map = mapUnits(splitBlocks(note), doc);
+		expect([...map.unitBlock]).toEqual([["p-1", 1], ["p-2", 2], ["p-3", 3]]);
 	});
 });
 

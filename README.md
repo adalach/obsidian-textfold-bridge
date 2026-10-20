@@ -13,7 +13,8 @@
 - **Drops from TextFold.** Drag a paragraph, a section's summary, a note, a conversation or a selection from TextFold's reader into any note, or copy and paste it: it goes in where you drop it, with its title, section and a link back.
 - **Insert link to a TextFold paper.** A command that searches TextFold's documents by title, id or citekey and inserts `[Title](textfold://open?paper=ID)` at the cursor. With text selected, the selection becomes the link's label.
 - **TextFold sidebar.** For the note you are in, two lists behind a switch at the top. **In this note**: every TextFold citation in the note, one line each with what it cites; a click goes to that place in the note. **In TextFold**: the TextFold documents the note refers to, each with its highlights, comments and Ask conversations under their sections; hover a line to read the whole note with the model's answer, open TextFold at it, copy or insert its link, or drag it into a note. Open the sidebar with the command **Open TextFold notes**.
-- **Fold this note.** Send the note you are writing to TextFold and read it at five levels there. When you edit it later, the sidebar says **Changed since folding** and offers **Refold**.
+- **Fold this note.** Read the note you are writing at TextFold's five levels, inside Obsidian: Full is your note as Obsidian shows it, and its words travel as you fold it down to Brief, Key, Takeaway and the Topic map, as in TextFold's reader.
+- **Export this note to TextFold.** Send the note to TextFold and read it there. Both use the same TextFold document, so a note folded in Obsidian opens in TextFold at the same place, with the same comments, and the other way round. When you edit the note, the sidebar says **Changed since folding** and offers **Refold**.
 - **Import notes from TextFold.** Bring a document's TextFold notes into the vault as a note of its own, and update it later without losing what you wrote in it.
 
 A note refers to a document through a property, a link in its text, or both:
@@ -63,14 +64,33 @@ A dragged or pasted bare `textfold://` link is filled in the same way from TextF
 
 ## Fold this note
 
-Run **Fold this note** (or the layers button in the sidebar) in a note. The first time, the plugin asks before it sends anything. Then:
+Run **Fold this note** (or the fold button in the sidebar) in a note. The note opens folded in its tab, at the level set under **Start level** (Full to begin with). Its TextFold document is the one **Export this note to TextFold** makes: if the note has none yet, or changed since, **Fold this note** exports it first (asking the first time, as Export does) and shows the note as written until TextFold is done. The pencil at the top goes back to the Markdown, and the TextFold icon beside it opens TextFold at the paragraph you are reading.
+
+The five levels, as in TextFold:
+
+- **Full**: your note as Obsidian renders it, with its links, pictures, callouts, code and maths. Its words are TextFold's words too: each paragraph is matched to TextFold's by order and wording, so they can travel to Brief and back.
+- **Brief**: the sentences TextFold keeps of each paragraph, your own words, with … where it left one out.
+- **Key**, **Takeaway** and **Topic** are written by the model; a line under the title says so and which model wrote them. At Key and Takeaway each section has its takeaway on top. Hover a written line to see the sentences of yours it rests on.
+- **Topic** is a map: a card per section with a chip per paragraph. Click a card for that section at Takeaway, a chip for that paragraph at Full.
+
+To change level, click a level, press **1** to **5** while the view has focus, or use **⌘ + scroll** (Ctrl + scroll on Windows and Linux) or a pinch: the words move with your fingers and settle on the nearer level when you stop, and the paragraph under the pointer stays where it is. Click a folded paragraph to read it alone at Full, and again to fold it back. With **Level control → Slider** a slider takes the place of the buttons and moves the words as you drag it. With reduced motion set in your system, levels change without moving.
+
+Your highlights, notes and Ask conversations from TextFold are shown with their paragraphs: with **TextFold comments → In the margin** in full beside Full and Brief, as one line beside Key and as a dot beyond; with **Under the paragraph** in full under it where it is read in full. Highlights are marked in the text either way, and a paragraph whose highlight is folded away gets a mark. Click a comment to open it in TextFold.
+
+**Language.** The menu at the top reads the note in another of TextFold's languages. The first time in a language, it asks before TextFold translates the note with its model, then shows the progress. In another language than the note's own, Full and Brief are the model's translation of your words, as the line under the title says, and the pencil still shows your Markdown. The view starts in the language set under **Settings → TextFold Bridge → Fold this note → Language**.
+
+**When TextFold is not running**, the view shows the fold it last read on this device (kept in Obsidian's local storage on this device, never in the vault), else the note at Full, and a line says so.
+
+## Export this note to TextFold
+
+Run **Export this note to TextFold** (or the upload button in the sidebar) in a note. The first time, the plugin asks before it sends anything. Then:
 
 1. It sends the note's text to TextFold as a Markdown document, with Obsidian's own syntax flattened: `[[Note|label]]` becomes `label`, `[[Note]]` becomes `Note`, `%% comments %%` are left out, a callout becomes a plain quote, and block ids and `==highlight==` marks go. Code is sent as written. The note's properties stay in Obsidian; only a `title` property goes along.
    - **Pictures go along.** A picture of the vault the note embeds (`![[plot.png]]`, `![[plot.png|300]]`, `![[photo.jpg|caption]]`, or `![alt](figures/plot.png)`) is sent inside the text as the picture itself, and TextFold keeps it with the document: PNG, JPEG, GIF and WebP up to 15 MB each. A picture on the web (`![alt](https://…)`) is sent as it is, and TextFold downloads it. SVG pictures, larger files and embeds that lead nowhere are left out, and so are embedded notes and PDFs. The notice after folding says how many pictures went along and which were left out, and why. Changing a picture's file counts as a change of the note.
 2. It records the new document's id in the note's `textfold:` property.
-3. TextFold folds it in the language set under **Settings → TextFold Bridge → Fold this note → Language** (`en` by default). **Folding uses the model you set up in TextFold**, at its cost. Without a model, TextFold stores the note and it reads as written; the sidebar says so.
+3. TextFold folds it in the language set under **Settings → TextFold Bridge → Fold this note → Language**: **TextFold's language** (the default) is the reading language set in TextFold, else English; or pick one of TextFold's languages. **Folding uses the model you set up in TextFold**, at its cost. Without a model, TextFold stores the note and it reads as written; the sidebar says so.
 
-The sidebar shows the fold's progress, then **Folded** with **Open in TextFold**. The plugin keeps a hash of the text it sent, so after an edit the sidebar shows **Changed since folding** and **Refold**. A refold puts the new text in place of the old under the same id: your highlights and questions on the note stay, TextFold finds their passages again in the new text, and asks its model only for the sections that changed. A note whose passage is gone after the edit stays, marked **Passage not found after the edit**. If TextFold is still folding the note, Refold says so and does nothing; if TextFold no longer has the document, the plugin takes the id out of the note's property, and the next **Fold this note** makes a new document.
+The sidebar shows the fold's progress, then **Folded** with **Fold in Obsidian** and **Open in TextFold**; the notice at the end offers both too. The plugin keeps a hash of the text it sent, so after an edit the sidebar shows **Changed since folding** and **Refold**. A refold puts the new text in place of the old under the same id: your highlights and questions on the note stay, TextFold finds their passages again in the new text, and asks its model only for the sections that changed. A note whose passage is gone after the edit stays, marked **Passage not found after the edit**. If TextFold is still folding the note, Refold says so and does nothing; if TextFold no longer has the document, the plugin takes the id out of the note's property, and the next fold or export makes a new document.
 
 Refold needs a TextFold with refold in place (newer than 0.10.15).
 
@@ -122,11 +142,15 @@ A TextFold run from a clone of its repository writes `server.json` in the clone'
 
 - The plugin talks only to TextFold on `127.0.0.1`. It refuses any other address, also one set by hand.
 - It reads TextFold's documents, notes and jobs with GET requests, one at a time, each given up after a few seconds. A drop or paste from TextFold reads only what was dropped (and asks TextFold for a bare link's title and text).
-- It writes to TextFold only when you fold a note: `POST /api/import` with the note's flattened text, and `POST /api/generate` to fold it. TextFold then sends the text to the model you set up in TextFold. Nothing else in TextFold is changed.
+- It writes to TextFold only when you fold or export a note, or translate one: `POST /api/import` with the note's flattened text, and `POST /api/generate` to fold or translate it. TextFold then sends the text to the model you set up in TextFold. Nothing else in TextFold is changed.
+- It asks TextFold for its languages (`GET /api/langs`) and its reading language (`GET /api/settings`); a TextFold without them gets its built-in list of languages and English.
+- The fold view keeps the last fold it read of each note in Obsidian's local storage on this device, to show while TextFold is not running. It is never written into the vault.
 - It reads TextFold's `server.json`, a file outside your vault (see the table above). This is why the plugin is desktop only.
 - It sends no telemetry and contacts no other server.
 - Text from TextFold is shown through Obsidian's Markdown renderer or as plain text, never inserted as HTML.
 
 ## License
 
-MIT. TextFold is a separate project under the Apache License 2.0.
+MIT, except two files of the fold view adapted from TextFold, which stay under the Apache License 2.0: `src/fold/align.ts` (the words of each level and their ids) and `src/fold/motion.ts` (the words travelling between levels), from TextFold's reader and word alignment. See `NOTICE` and `LICENSE-APACHE-2.0`.
+
+TextFold is a separate project by Xia Chen, [github.com/chenxiachan/textfold](https://github.com/chenxiachan/textfold), under the Apache License 2.0. The fold view follows its reader: the five levels, the words that travel between them and the Topic map are TextFold's design.

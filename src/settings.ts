@@ -1,5 +1,5 @@
 // Settings: where TextFold is, and where a textfold:// link opens.
-import { App, PluginSettingTab, Setting, SettingDefinitionItem } from "obsidian";
+import { App, PluginSettingTab, Setting, SettingDefinitionItem, debounce } from "obsidian";
 import type TextFoldBridgePlugin from "./main";
 import { DEFAULT_URL, Resolved, loopbackUrl } from "./server";
 
@@ -24,6 +24,9 @@ export function describeConnection(r: Resolved | null): string {
 }
 
 export class BridgeSettingTab extends PluginSettingTab {
+	// a changed address is checked once typing pauses
+	private recheck = debounce(() => void this.plugin.client.check(), 600, true);
+
 	constructor(app: App, private plugin: TextFoldBridgePlugin) {
 		super(app, plugin);
 	}
@@ -83,6 +86,9 @@ export class BridgeSettingTab extends PluginSettingTab {
 		else if (key === "openIn") s.openIn = value === "app" ? "app" : "browser";
 		await this.plugin.saveSettings();
 		if (key === "addressMode") this.update();
-		if (key !== "openIn") this.plugin.client.reset();
+		if (key !== "openIn") {
+			this.plugin.client.reset();
+			this.recheck();
+		}
 	}
 }

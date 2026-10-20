@@ -158,8 +158,15 @@
 	margin-bottom: 2px;
 }
 
-.tfb-card-a p {
+.tfb-card-a p,
+.tfb-card-a ul,
+.tfb-card-a ol {
 	margin: 4px 0;
+}
+
+.tfb-card-a ul,
+.tfb-card-a ol {
+	padding-inline-start: 18px;
 }
 
 /* the picker: title and id on one line */

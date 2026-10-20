@@ -271,9 +271,11 @@
 }
 
 /* an item dropped from TextFold: > [!textfold] Title › Section; [!textfold|written] when its text is a model's words */
+/* the colour of the theme's own "example" callout, in whatever form the theme gives it (an rgb triplet in Obsidian's
+   default theme, hex in Minimal), so the background works everywhere; its purple is close to TextFold's */
 .callout[data-callout="textfold"] {
-	--callout-color: var(--color-cyan-rgb);
-	--callout-icon: lucide-book-open-text;
+	--callout-color: var(--callout-example);
+	--callout-icon: textfold-logo;
 }
 
 .callout[data-callout="textfold"][data-callout-metadata~="written"] .callout-title-inner::after {
@@ -281,4 +283,26 @@
 	color: var(--text-faint);
 	font-size: var(--font-ui-smaller);
 	font-weight: var(--font-normal);
+}
+
+/* a [↗](textfold://…) link drawn as TextFold's icon, inline at the text's height */
+.tfb-icon-link,
+.tfb-icon-link.external-link {
+	display: inline-flex;
+	align-items: center;
+	vertical-align: -0.1em;
+	padding: 0 1px;
+	background-image: none;
+	color: var(--text-accent);
+	--icon-size: 0.95em;
+	cursor: pointer;
+}
+
+.tfb-icon-link:hover {
+	color: var(--text-accent-hover);
+}
+
+.tfb-icon-link .svg-icon {
+	width: 0.95em;
+	height: 0.95em;
 }

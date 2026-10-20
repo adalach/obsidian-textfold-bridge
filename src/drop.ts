@@ -38,7 +38,9 @@ export class Drops {
 		const item = isItem(found) ? found : await this.fromLink(found);
 		const mode = this.mode();
 		const md = formatItem(item, mode);
-		const text = mode === "link" ? inline(editor, at, md) : asBlock(editor, at, md);
+		// a link, or text with the icon dropped among words, goes in among them; anything else on lines of its own
+		const amongWords = editor.getLine(at.line).trim() !== "";
+		const text = mode === "link" || (mode === "icon" && amongWords) ? inline(editor, at, md) : asBlock(editor, at, md);
 		editor.replaceRange(text, at);
 		editor.setCursor(editor.offsetToPos(editor.posToOffset(at) + text.length));
 	}

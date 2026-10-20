@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseDoc } from "../src/doc";
-import { DRAG_MIME, DragItem, formatItem, isItem, itemFromLink, itemLabel, jsonFromHtml, linkFromText, parseDragJson, readTransfer, toDragJson } from "../src/drag";
+import { DRAG_MIME, DragItem, formatItem, isItem, itemFromLink, itemLabel, itemSentence, jsonFromHtml, linkFromText, parseDragJson, readTransfer, toDragJson } from "../src/drag";
 import { parseNotes } from "../src/notes";
 
 // what TextFold's reader sends when a paragraph is dragged at Key (the contract, with made-up text)
@@ -172,3 +172,26 @@ describe("itemFromLink", () => {
 		expect(itemFromLink({ paper: "2602.07369" }, doc, null)).toMatchObject({ kind: "paper", text: "Chen, Xia · 2026" });
 	});
 });
+
+describe("text with a TextFold icon", () => {
+	const of = (o: Record<string, unknown>) => parseDragJson(JSON.stringify({ ...wire, ...o }))!;
+
+	it("writes the text, then a ↗ link back", () => {
+		expect(formatItem(of({}), "icon")).toBe("Primitives are fitted greedily. Each is convex. [↗](textfold://open?paper=2602.07369&u=S3.p2&level=key)");
+	});
+
+	it("reads each kind as it was dragged, on one line", () => {
+		expect(itemSentence(of({ kind: "summary", text: "Greedy fitting\nof primitives", link: "textfold://open?paper=2602.07369&s=S3&level=key" }))).toBe("Greedy fitting of primitives");
+		expect(itemSentence(of({ kind: "selection", text: "fitted greedily", quote: "fitted greedily", written: false }))).toBe("fitted greedily");
+		expect(itemSentence(of({ kind: "chip", text: "greedy fitting", level: "topic" }))).toBe("greedy fitting");
+		expect(itemSentence(of({ kind: "note", text: "Why greedy?", quote: "fitted greedily", comment: "Why greedy?", written: false }))).toBe("fitted greedily — Why greedy?");
+		expect(itemSentence(of({ kind: "note", text: "fitted greedily", quote: "fitted greedily", written: false }))).toBe("fitted greedily");
+		expect(itemSentence(of({ kind: "ask", text: "Yes, always [[S3.p2]].", quote: "Each is convex.", comment: "Always?" }))).toBe("Yes, always ([S3.p2](textfold://open?paper=2602.07369&u=S3.p2)).");
+	});
+
+	it("keeps text as text, and names the document when nothing was dragged", () => {
+		expect(formatItem(of({ text: "See [[Other note]].", written: false }), "icon")).toBe("See \\[\\[Other note]]. [↗](textfold://open?paper=2602.07369&u=S3.p2&level=key)");
+		expect(formatItem(of({ text: "", section: null, kind: "paragraph" }), "icon")).toBe("Convex Primitive Decomposition [↗](textfold://open?paper=2602.07369&u=S3.p2&level=key)");
+	});
+});
+

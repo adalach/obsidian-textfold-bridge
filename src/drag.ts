@@ -14,7 +14,10 @@ import { answerMarkdown } from "./notesMarkdown";
 
 export const DRAG_MIME = "application/x-textfold+json";
 
-export type DropMode = "callout" | "quote" | "link";
+export type DropMode = "callout" | "quote" | "link" | "icon";
+
+/** The label of a link the plugin draws as TextFold's icon: `<text> [↗](textfold://…)`. */
+export const ICON_LABEL = "↗";
 
 export interface DragItem {
 	paper: string;
@@ -182,12 +185,14 @@ function safeText(text: string, paper: string, citations: boolean): string {
 
 const quoted = (s: string) => s.split("\n").map(l => (l.trim() ? `> ${l}` : ">"));
 
-/** The Markdown a drop inserts: a [!textfold] callout (the default), a quote with the link, or the link alone. A
- *  model's words are marked: the callout as `[!textfold|written]`, a quote with a line that says so. */
+/** The Markdown a drop inserts: a [!textfold] callout (the default), a quote with the link, the link alone, or the
+ *  text followed by a ↗ link (drawn as TextFold's icon). A model's words are marked: the callout as
+ *  `[!textfold|written]`, a quote with a line that says so. */
 export function formatItem(item: DragItem, mode: DropMode): string {
 	const link = buildLink(item.link);
 	const label = itemLabel(item).replace(/([[\]])/g, "\\$1") || item.paper;
 	if (mode === "link") return `[${label}](${link})`;
+	if (mode === "icon") return `${itemSentence(item) || label} [${ICON_LABEL}](${link})`;
 	const parts = itemParts(item);
 	const written = item.written && parts.some(p => p.written);
 	const body: string[] = [];
@@ -203,6 +208,15 @@ export function formatItem(item: DragItem, mode: DropMode): string {
 	const out = [`> [!textfold${written ? "|written" : ""}] ${itemLabel(item) || item.paper}`, ...body];
 	out.push(">", `> [Open in TextFold](${link})`);
 	return out.join("\n");
+}
+
+/** What was dragged as it reads, on one line: a paragraph, summary, section, selection or chip as shown; a note's
+ *  passage, then the reader's words; a conversation's answer in one sentence. */
+export function itemSentence(item: DragItem): string {
+	const line = (s: string | undefined, citations = false) => (s ? safeText(s.replace(/\s+/g, " "), item.paper, citations) : "");
+	if (item.kind === "note") return [line(item.quote), line(item.comment)].filter(Boolean).join(" — ") || line(item.text);
+	if (item.kind === "ask") return line(item.text, true) || line(item.quote);
+	return line(item.text || item.quote, item.written);
 }
 
 /** What an item shows, in order, as TextFold's own Markdown for it does: a note's passage, then the reader's words;

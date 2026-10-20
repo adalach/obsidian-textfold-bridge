@@ -2,11 +2,13 @@
 // textfold:// links in notes (with hover previews), a sidebar with TextFold's notes for the open note, a picker that
 // inserts a link, items dragged in from TextFold, "Fold this note" to read a note in TextFold, and "Import notes" to
 // bring TextFold's notes into the vault.
-import { Notice, Plugin, TFile } from "obsidian";
+import { Notice, Plugin, TFile, addIcon } from "obsidian";
 import { TextFoldClient } from "./client";
 import { Drops } from "./drop";
 import { FoldRecord, Folds } from "./fold";
 import { LinkPreviews } from "./hover";
+import { ICON, ICON_SVG } from "./icon";
+import { installIconLinks } from "./iconLinks";
 import { ImportPicker, Importer } from "./importer";
 import { LinkOpener, listenDocuments } from "./opener";
 import { insertPaperLink } from "./picker";
@@ -28,6 +30,7 @@ export default class TextFoldBridgePlugin extends Plugin {
 
 	async onload(): Promise<void> {
 		await this.loadSettings();
+		addIcon(ICON, ICON_SVG);
 		this.client = new TextFoldClient(() => ({ mode: this.settings.addressMode, manualUrl: this.settings.manualUrl, folder: this.settings.sourceFolder }));
 		this.opener = new LinkOpener(this.client, () => this.settings.openIn);
 		this.opener.install(this);
@@ -36,6 +39,7 @@ export default class TextFoldBridgePlugin extends Plugin {
 		this.folds = new Folds(this.app, this.client, () => this.folded, () => this.saveSettings(), () => this.settings.foldLang);
 		this.register(() => this.folds.stop());
 		new Drops(this, this.client, () => this.settings.dropAs).install();
+		installIconLinks(this);
 		this.importer = new Importer(this.app, this.client, () => ({ folder: this.settings.importFolder, byCitekey: this.settings.importNames === "citekey" }));
 
 		this.registerView(VIEW_TYPE, leaf => new TextFoldNotesView(leaf, this));

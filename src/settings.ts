@@ -111,8 +111,8 @@ export class BridgeSettingTab extends PluginSettingTab {
 				items: [
 					{
 						name: "Dropped TextFold items as",
-						desc: "What a paragraph, note or selection dragged or pasted from TextFold (or from the sidebar) becomes in a note: a callout with its text and link, a quote with the link, or the link alone.",
-						control: { type: "dropdown", key: "dropAs", defaultValue: DEFAULT_SETTINGS.dropAs, options: { callout: "Callout", quote: "Quote with the link", link: "Link only" } },
+						desc: "What a paragraph, note or selection dragged or pasted from TextFold (or from the sidebar) becomes in a note: a callout with its text and link, a quote with the link, the link alone, or its text followed by a small TextFold icon that links back.",
+						control: { type: "dropdown", key: "dropAs", defaultValue: DEFAULT_SETTINGS.dropAs, options: { callout: "Callout", quote: "Quote with the link", link: "Link only", icon: "Text with a TextFold icon" } },
 					},
 				],
 			},
@@ -164,7 +164,7 @@ export class BridgeSettingTab extends PluginSettingTab {
 		else if (key === "sourceFolder") s.sourceFolder = text;
 		else if (key === "openIn") s.openIn = value === "app" ? "app" : "browser";
 		else if (key === "hoverPreviews") s.hoverPreviews = value === true;
-		else if (key === "dropAs") s.dropAs = value === "quote" || value === "link" ? value : "callout";
+		else if (key === "dropAs") s.dropAs = value === "quote" || value === "link" || value === "icon" ? value : "callout";
 		else if (key === "foldLang") s.foldLang = text || DEFAULT_SETTINGS.foldLang;
 		else if (key === "importFolder") s.importFolder = text || DEFAULT_SETTINGS.importFolder;
 		else if (key === "importNames") s.importNames = value === "citekey" ? "citekey" : "title";

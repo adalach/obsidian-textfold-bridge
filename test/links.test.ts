@@ -26,7 +26,7 @@ describe("parseLink", () => {
 	});
 
 	it("decodes URL-encoded values", () => {
-		expect(parseLink("textfold://open?paper=zotero-g5482058-8rin8pi4&u=S1%2Ep2")).toEqual({ paper: "zotero-g5482058-8rin8pi4", u: "S1.p2" });
+		expect(parseLink("textfold://open?paper=md-sample-notes-1a2b3c4d&u=S1%2Ep2")).toEqual({ paper: "md-sample-notes-1a2b3c4d", u: "S1.p2" });
 	});
 
 	it("takes the scheme and level in any case, and a slash before the query", () => {

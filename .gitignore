@@ -11,3 +11,6 @@ design/
 temp/
 
 .DS_Store
+
+# this machine's vault for npm run build to copy into (esbuild.config.mjs)
+local.config.json

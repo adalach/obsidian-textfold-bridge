@@ -10,7 +10,7 @@ npm test        # the logic tests in test/
 npm run lint    # eslint with Obsidian's plugin review rules (eslint-plugin-obsidianmd)
 ```
 
-Obsidian loads `main.js`, `manifest.json` and `styles.css` from `<vault>/.obsidian/plugins/textfold-bridge/`. Each build copies the three files there: into the folder named by the `TEXTFOLD_BRIDGE_PLUGIN_DIR` environment variable, or else into `~/Documents/Obsidian Vault/.obsidian/plugins/textfold-bridge/` when that vault's plugins folder exists. After a rebuild, run `obsidian plugin:reload id=textfold-bridge` (the Obsidian CLI; add `vault="<name>"` when more than one vault is open) or turn the plugin off and on under **Settings → Community plugins**.
+Obsidian loads `main.js`, `manifest.json` and `styles.css` from `<vault>/.obsidian/plugins/textfold-bridge/`. Each build copies the three files there: into the folder named by the `TEXTFOLD_BRIDGE_PLUGIN_DIR` environment variable, or else by `pluginDir` in a git-ignored `local.config.json`, such as `{"pluginDir": "~/Vault/.obsidian/plugins/textfold-bridge"}`. With neither, a build only writes `main.js`. After a rebuild, run `obsidian plugin:reload id=textfold-bridge` (the Obsidian CLI; add `vault="<name>"` when more than one vault is open) or turn the plugin off and on under **Settings → Community plugins**.
 
 ## Against a running TextFold
 

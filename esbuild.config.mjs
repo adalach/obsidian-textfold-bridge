@@ -1,14 +1,16 @@
 import * as esbuild from "esbuild";
 import { existsSync } from "node:fs";
-import { copyFile, mkdir } from "node:fs/promises";
+import { copyFile, mkdir, readFile } from "node:fs/promises";
 import { builtinModules } from "node:module";
 import { homedir } from "node:os";
 import path from "node:path";
 
-// After a build, copy the plugin into a vault to try it: TEXTFOLD_BRIDGE_PLUGIN_DIR, or else
-// ~/Documents/Obsidian Vault/.obsidian/plugins/textfold-bridge when that vault's plugins folder exists.
-const pluginsDir = path.join(homedir(), "Documents", "Obsidian Vault", ".obsidian", "plugins");
-const vaultDir = process.env.TEXTFOLD_BRIDGE_PLUGIN_DIR ?? (existsSync(pluginsDir) ? path.join(pluginsDir, "textfold-bridge") : null);
+// After a build, copy the plugin into a vault to try it: the folder named by TEXTFOLD_BRIDGE_PLUGIN_DIR, or else by
+// "pluginDir" in local.config.json (git-ignored, so a vault's path never goes into the repository), such as
+// {"pluginDir": "~/Vault/.obsidian/plugins/textfold-bridge"}. With neither, the build only writes main.js.
+const expand = p => (p && p.startsWith("~") ? path.join(homedir(), p.slice(1)) : p);
+const local = existsSync("local.config.json") ? JSON.parse(await readFile("local.config.json", "utf8")) : {};
+const vaultDir = expand(process.env.TEXTFOLD_BRIDGE_PLUGIN_DIR ?? local.pluginDir ?? null);
 
 await esbuild.build({
   entryPoints: ["src/main.ts"],

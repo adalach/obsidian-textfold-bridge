@@ -76,11 +76,17 @@ Refold needs a TextFold with refold in place (newer than 0.10.15).
 
 ## Import notes
 
-**Import notes from TextFold** picks a document, or all documents that have notes; the sidebar's download buttons import the documents shown there. Each document becomes one note in the folder set under **Import notes → Folder** (`TextFold` by default), named by its short title (the part before a colon) or, with **Note names → Citekey**, by its citekey when TextFold has one.
+**Import notes from TextFold** picks a document, or all documents that have notes; the sidebar's download buttons import the documents shown there. Each document becomes one note, named by its short title (the part before a colon) or, with **Note names → Citekey**, by its citekey when TextFold has one. **Location for imported notes**, as Obsidian words it for attachments, says where a new one goes:
+
+- **In the folder specified below** (default): the folder set under **Folder**, `TextFold` to begin with.
+- **Same folder as current note**: next to the note that is open when the import starts (for the sidebar's buttons, the note the sidebar shows). With no note open, the folder setting is used, and the notice says so.
+- **Vault folder**: the top of the vault.
+
+A document never gets a second note: before creating one, the plugin looks through the whole vault for the note it imported before (by its `textfold` property and the marker comments below), and updates that one where it is now, also after you moved it. The notice says what happened, such as "Updated Convex Partition Zoner in Research/Zoning" or "Created …".
 
 - Properties: `textfold` (the id), `title`, `authors`, `year`, `citekey` when there is one, and `link` (`textfold://open?paper=…`).
 - The notes come between two marker comments, `%% TextFold notes: … %%` and `%% End of TextFold notes %%`, in the style of TextFold's own Markdown export for Obsidian: grouped by section, each highlight a quote with the note's id as its block id (`^n-…`, so other notes can link to it), then your comment; each Ask conversation a `[!question]` callout, its citations links to the paragraphs they name. Each note's last line (your comment, else its passage or conversation) ends with a `↗` link back to it in TextFold, drawn as TextFold's icon; the document's own link at the top stays a plain link. A re-import rewrites these lines with the rest of the block.
-- Importing again finds the note by its `textfold` property, replaces only what is between the markers and the properties above, and keeps everything else you wrote in the note and its other properties. An unchanged document leaves the note untouched.
+- Importing again finds the note by its `textfold` property and the markers, wherever it is in the vault, replaces only what is between the markers and the properties above, and keeps everything else you wrote in the note and its other properties. An unchanged document leaves the note untouched.
 
 Section names, paragraph previews and the cite labels in imported answers come from TextFold's `GET /api/doc` (newer than 0.10.15); with an older TextFold the plugin works without them.
 

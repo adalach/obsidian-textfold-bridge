@@ -38,7 +38,7 @@ export class Drops {
 		const item = isItem(found) ? found : await this.fromLink(found);
 		const mode = this.mode();
 		const md = formatItem(item, mode);
-		const text = mode === "link" ? md : asBlock(editor, at, md);
+		const text = mode === "link" ? inline(editor, at, md) : asBlock(editor, at, md);
 		editor.replaceRange(text, at);
 		editor.setCursor(editor.offsetToPos(editor.posToOffset(at) + text.length));
 	}
@@ -57,6 +57,14 @@ function dropPosition(editor: Editor, evt: DragEvent): EditorPosition | null {
 	const cm = (editor as unknown as { cm?: EditorView }).cm;
 	const offset = cm?.posAtCoords({ x: evt.clientX, y: evt.clientY });
 	return offset === null || offset === undefined ? null : editor.offsetToPos(offset);
+}
+
+/** A link among words, with a space on either side where it would touch one. */
+function inline(editor: Editor, at: EditorPosition, md: string): string {
+	const line = editor.getLine(at.line);
+	const before = line.slice(0, at.ch);
+	const after = line.slice(at.ch);
+	return `${before && !/\s$/.test(before) ? " " : ""}${md}${after && !/^\s/.test(after) ? " " : ""}`;
 }
 
 /** A callout or quote on lines of its own, with blank lines around it: in the middle of a paragraph it splits it. */

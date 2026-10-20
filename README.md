@@ -9,9 +9,10 @@
 ## What it does
 
 - **`textfold://` links.** A link opens the paper in TextFold, at a paragraph, a note or a zoom level. Click it in Reading view, in Live Preview or in the sidebar.
-- **Hover previews.** Hover a link to see its paragraph (at the link's level, else Takeaway), its note, or the paper's title and authors. In Reading view a hover is enough; in the editor hold Cmd (Ctrl on Windows and Linux), as with Obsidian's page previews.
+- **Hover previews.** Hover a link to see its paragraph (at the link's level, else Takeaway), its section's title and summary, its note, or the paper's title and authors. In Reading view a hover is enough; in the editor hold Cmd (Ctrl on Windows and Linux), as with Obsidian's page previews.
+- **Drops from TextFold.** Drag a paragraph, a section's summary, a note, a conversation or a selection from TextFold's reader into any note, or copy and paste it: it goes in where you drop it, with its title, section and a link back.
 - **Insert link to a TextFold paper.** A command that searches TextFold's documents by title, id or citekey and inserts `[Title](textfold://open?paper=ID)` at the cursor. With text selected, the selection becomes the link's label.
-- **TextFold notes sidebar.** For the note you are in, the TextFold documents it refers to, each with its highlights, comments and Ask conversations, one line per note, under the names of their sections. Hover a line to read the whole note, with the model's answer and the paragraphs it cites. Each line can open TextFold at that note, copy a link to it, or insert the link at the cursor. Open it with the command **Open TextFold notes**.
+- **TextFold notes sidebar.** For the note you are in, the TextFold documents it refers to, each with its highlights, comments and Ask conversations, one line per note, under the names of their sections. Hover a line to read the whole note, with the model's answer and the paragraphs it cites. Each line can open TextFold at that note, copy a link to it, or insert the link at the cursor, and can be dragged into a note like an item from TextFold. Open it with the command **Open TextFold notes**.
 - **Fold this note.** Send the note you are writing to TextFold and read it at five levels there. When you edit it later, the sidebar says **Changed since folding** and offers **Refold**.
 - **Import notes from TextFold.** Bring a document's TextFold notes into the vault as a note of its own, and update it later without losing what you wrote in it.
 
@@ -25,6 +26,25 @@ The zoning step follows [Convex Partition Zoner](textfold://open?paper=pdf-357ae
 ```
 
 `textfold:` also takes a list of ids. Put an arXiv id in quotes, as above, or YAML may read it as a number and drop a trailing zero.
+
+## Drops from TextFold
+
+Drag something from TextFold's reader (a paragraph by its handle, a heading, a summary, a chip of the Topic map, a note's card, or selected text) into a note, or copy it and paste. The item goes in at the drop point, as set under **Settings → TextFold Bridge → Drops from TextFold → Dropped TextFold items as**:
+
+- **Callout** (default):
+
+  ```markdown
+  > [!textfold] Convex Primitive Decomposition › 3 Method
+  > The paragraph, at the level it was dragged at.
+  >
+  > [Open in TextFold](textfold://open?paper=2602.07369&u=S3.p2&level=key)
+  ```
+
+  A note shows its passage and then your comment; a conversation its passage, your question in bold and the answer. When the text is the model's words (a Key, Takeaway or Topic level, a summary, an answer), the callout says `[!textfold|written]` and shows "written by the model" after its title.
+- **Quote with the link**: the text as a quote, ending in `— [Title › Section](link)`.
+- **Link only**: `[Title › Section](link)` among the words where it was dropped.
+
+A dragged or pasted bare `textfold://` link is filled in the same way from TextFold (title, section, the paragraph or summary at the link's level). Every other drop and paste is left to Obsidian. Rows of the TextFold notes sidebar can be dragged into a note the same way.
 
 ## Fold this note
 
@@ -51,16 +71,18 @@ Section names, paragraph previews and the cite labels in imported answers come f
 ## Links
 
 ```
-textfold://open?paper=<document id>[&u=<paragraph id>][&n=<note id>][&level=<full|brief|key|takeaway|topic>][&lang=<code>]
+textfold://open?paper=<document id>[&s=<section id>][&u=<paragraph id>][&n=<note id>][&level=<full|brief|key|takeaway|topic>][&lang=<code>]
 ```
 
 - `paper`: the document's id in TextFold, as in its reader's address (`/p/<id>`).
-- `u`: a paragraph; `n`: one of your notes; `level`: the zoom level; `lang`: the language to read it in.
+- `s`: a section; `u`: a paragraph; `n`: one of your notes; `level`: the zoom level; `lang`: the language to read it in.
+
+Before it opens a link, the plugin asks the running TextFold whether it has the document. If it has not (a link to a paper in another TextFold library, or one deleted since), a notice names the paper and nothing opens, instead of TextFold's home screen. If TextFold is not running, a link in **TextFold app** mode opens anyway, which starts the app.
 
 **Settings → TextFold Bridge → Links → Open links in** chooses where a link opens:
 
 - **Browser** (default): TextFold's reader page on the running TextFold, in your default browser.
-- **TextFold app**: Obsidian hands the `textfold://` link to the system, for TextFold's desktop app to open. Only a packaged TextFold app registers itself for these links, so keep **Browser** unless you have one that does. Obsidian asks once before it opens links of a new kind; tick **Always open** there to stop the question.
+- **TextFold app**: Obsidian hands the `textfold://` link to the system, for TextFold's desktop app to open. Only a packaged TextFold app that handles these links registers itself for them (TextFold 0.10.16 builds with it do), so keep **Browser** unless you have one. Obsidian asks once before it opens links of a new kind; tick **Always open** there to stop the question.
 
 ## Finding TextFold
 
@@ -77,7 +99,7 @@ A TextFold run from a clone of its repository writes `server.json` in the clone'
 ## Privacy
 
 - The plugin talks only to TextFold on `127.0.0.1`. It refuses any other address, also one set by hand.
-- It reads TextFold's documents, notes and jobs with GET requests, one at a time, each given up after a few seconds.
+- It reads TextFold's documents, notes and jobs with GET requests, one at a time, each given up after a few seconds. A drop or paste from TextFold reads only what was dropped (and asks TextFold for a bare link's title and text).
 - It writes to TextFold only when you fold a note: `POST /api/import` with the note's flattened text, and `POST /api/generate` to fold it. TextFold then sends the text to the model you set up in TextFold. Nothing else in TextFold is changed.
 - It reads TextFold's `server.json`, a file outside your vault (see the table above). This is why the plugin is desktop only.
 - It sends no telemetry and contacts no other server.

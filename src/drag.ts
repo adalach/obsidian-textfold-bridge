@@ -129,13 +129,18 @@ export function itemFromLink(link: TextFoldLink, doc: Doc | null, nf: NotesFile 
 	if (note) {
 		item.kind = note.kind === "ask" ? "ask" : "note";
 		item.section = section(index?.sectionOf(note.unit, note.section));
-		const turn = note.kind === "ask" ? note.thread.find(t => t.a) : undefined;
-		if (turn) {
-			item.text = `**${turn.q}**\n\n${turn.a}`;
-			item.written = true;
-		} else item.text = note.quote || noteLine(note);
-		if (turn && note.quote) item.quote = note.quote;
-		if (note.text.trim()) item.comment = note.text.trim();
+		// as TextFold's reader sends them: a note's text is the reader's words (else the passage), an Ask's is the last
+		// answer in one sentence, its comment the reader's question
+		if (note.quote) item.quote = note.quote;
+		if (note.kind === "ask") {
+			const said = [...note.thread].reverse().find(t => t.a);
+			item.text = said ? said.takeaway || said.a : "";
+			item.written = !!said;
+			if (note.thread[0]?.q) item.comment = note.thread[0].q;
+		} else {
+			item.text = note.text.trim() || note.quote || noteLine(note);
+			if (note.text.trim()) item.comment = note.text.trim();
+		}
 	} else if (link.u && index?.unit(link.u)) {
 		const unit = index.unit(link.u);
 		const lv = level ?? "full";
@@ -167,9 +172,10 @@ export function itemLabel(item: DragItem): string {
 	return [shortTitle(item.title), s].filter(Boolean).join(" › ").replace(/\s+/g, " ").trim();
 }
 
-/** Text from TextFold as Markdown that stays text in the vault: citations become reader links, no other [[ … ]] can
- *  become a wikilink, and no line can end the quote it is put in. */
-function safeText(text: string, paper: string): string {
+/** Text from TextFold as Markdown that stays text in the vault: in a model's words citations become reader links, and
+ *  no other [[ … ]] can become a wikilink. */
+function safeText(text: string, paper: string, citations: boolean): string {
+	if (!citations) return text.replace(/\[\[/g, "\\[\\[").replace(/\r\n?/g, "\n").trim();
 	const kept = text.replace(/\[\[([^[\]]+)\]\]/g, (m, x: string) => (/^(?:[\w.-]+|\?|!\d+)$/.test(x.trim()) ? m : `\uE001${x}]]`));
 	return answerMarkdown(kept, paper, null).replace(/\[\[|\uE001/g, "\\[\\[").replace(/\r\n?/g, "\n").trim();
 }
@@ -182,20 +188,44 @@ export function formatItem(item: DragItem, mode: DropMode): string {
 	const link = buildLink(item.link);
 	const label = itemLabel(item).replace(/([[\]])/g, "\\$1") || item.paper;
 	if (mode === "link") return `[${label}](${link})`;
-	const text = safeText(item.text || item.quote || "", item.paper);
-	const comment = item.comment ? safeText(item.comment, item.paper) : "";
-	if (mode === "quote") {
-		const out = text ? quoted(text) : [];
-		if (comment) out.push(">", ...quoted(comment));
-		if (out.length) out.push(">");
-		out.push(`> — [${label}](${link})${item.written && text ? " · *written by the model*" : ""}`);
-		return out.join("\n");
+	const parts = itemParts(item);
+	const written = item.written && parts.some(p => p.written);
+	const body: string[] = [];
+	for (const p of parts) {
+		if (body.length) body.push(">");
+		body.push(...quoted(p.md));
 	}
-	const out = [`> [!textfold${item.written && text ? "|written" : ""}] ${itemLabel(item) || item.paper}`];
-	if (text) out.push(...quoted(text));
-	if (comment) out.push(">", ...quoted(comment));
+	if (mode === "quote") {
+		if (body.length) body.push(">");
+		body.push(`> — [${label}](${link})${written ? " · *written by the model*" : ""}`);
+		return body.join("\n");
+	}
+	const out = [`> [!textfold${written ? "|written" : ""}] ${itemLabel(item) || item.paper}`, ...body];
 	out.push(">", `> [Open in TextFold](${link})`);
 	return out.join("\n");
+}
+
+/** What an item shows, in order, as TextFold's own Markdown for it does: a note's passage, then the reader's words;
+ *  an Ask's passage, the reader's question in bold, then the model's answer; anything else its text. */
+function itemParts(item: DragItem): { md: string; written: boolean }[] {
+	const own = (s?: string) => (s ? safeText(s, item.paper, false) : "");
+	const parts: { md: string; written: boolean }[] = [];
+	const add = (md: string, written = false) => {
+		if (md) parts.push({ md, written });
+	};
+	if (item.kind === "note") {
+		add(own(item.quote));
+		add(own(item.comment ?? (item.quote ? "" : item.text)), item.written && !item.comment);
+		if (!parts.length) add(own(item.text), item.written);
+	} else if (item.kind === "ask") {
+		add(own(item.quote));
+		if (item.comment) add(`**${own(item.comment)}**`);
+		add(safeText(item.text, item.paper, true), item.written);
+	} else {
+		add(safeText(item.text || item.quote || "", item.paper, item.written), item.written);
+		add(own(item.comment));
+	}
+	return parts;
 }
 
 /** An item as TextFold's drag JSON (the sidebar's rows send what TextFold's reader sends). */

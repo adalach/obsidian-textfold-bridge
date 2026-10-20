@@ -100,6 +100,36 @@ describe("formatItem", () => {
 		expect(md.split("\n").every(l => l.startsWith(">"))).toBe(true);
 	});
 
+	it("leaves the reader's own comment as written, its [[ ]] escaped rather than made a citation", () => {
+		const md = formatItem({ ...item, written: false, text: "Author's words [[S3.p1]].", comment: "See [[frjyhfh]]." }, "callout");
+		expect(md).toContain("> Author's words \\[\\[S3.p1]].");
+		expect(md).toContain("> See \\[\\[frjyhfh]].");
+	});
+
+	it("shows a note as its passage, then the reader's words, as TextFold sends it", () => {
+		const note = parseDragJson(JSON.stringify({ ...wire, kind: "note", level: "full", text: "Why greedy?", quote: "fitted greedily", comment: "Why greedy?", written: false, link: "textfold://open?paper=2602.07369&n=n-1&lang=en" }))!;
+		expect(formatItem(note, "callout")).toBe([
+			"> [!textfold] Convex Primitive Decomposition › 3 Method",
+			"> fitted greedily",
+			">",
+			"> Why greedy?",
+			">",
+			"> [Open in TextFold](textfold://open?paper=2602.07369&n=n-1&lang=en)",
+		].join("\n"));
+	});
+
+	it("shows an Ask as passage, question and the model's answer", () => {
+		const ask = parseDragJson(JSON.stringify({ ...wire, kind: "ask", text: "Yes, always [[S3.p2]].", quote: "Each is convex.", comment: "Always?", written: true, link: "textfold://open?paper=2602.07369&n=n-2" }))!;
+		expect(formatItem(ask, "callout").split("\n").slice(0, 6)).toEqual([
+			"> [!textfold|written] Convex Primitive Decomposition › 3 Method",
+			"> Each is convex.",
+			">",
+			"> **Always?**",
+			">",
+			"> Yes, always ([S3.p2](textfold://open?paper=2602.07369&u=S3.p2)).",
+		]);
+	});
+
 	it("says what an item without text is", () => {
 		const bare: DragItem = { paper: "x1", title: "x1", authors: [], section: null, kind: "paper", text: "", written: true, link: { paper: "x1" } };
 		expect(formatItem(bare, "callout")).toBe("> [!textfold] x1\n>\n> [Open in TextFold](textfold://open?paper=x1)");
@@ -133,8 +163,8 @@ describe("itemFromLink", () => {
 	});
 
 	it("fills a note link with the passage and comment, an Ask with its question and answer", () => {
-		expect(itemFromLink({ paper: "2602.07369", n: "n-1" }, doc, nf)).toMatchObject({ kind: "note", text: "fitted greedily", comment: "Why greedy?", written: false });
-		expect(itemFromLink({ paper: "2602.07369", n: "n-2" }, doc, nf)).toMatchObject({ kind: "ask", text: "**Always?**\n\nYes [[S3.p2]].", quote: "Each is convex.", written: true });
+		expect(itemFromLink({ paper: "2602.07369", n: "n-1" }, doc, nf)).toMatchObject({ kind: "note", text: "Why greedy?", quote: "fitted greedily", comment: "Why greedy?", written: false });
+		expect(itemFromLink({ paper: "2602.07369", n: "n-2" }, doc, nf)).toMatchObject({ kind: "ask", text: "Yes.", quote: "Each is convex.", comment: "Always?", written: true });
 	});
 
 	it("names the document when TextFold gave nothing", () => {

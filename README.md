@@ -65,7 +65,8 @@ A dragged or pasted bare `textfold://` link is filled in the same way from TextF
 
 Run **Fold this note** (or the layers button in the sidebar) in a note. The first time, the plugin asks before it sends anything. Then:
 
-1. It sends the note's text to TextFold as a Markdown document, with Obsidian's own syntax flattened: `[[Note|label]]` becomes `label`, `[[Note]]` becomes `Note`, embeds, images and `%% comments %%` are left out, a callout becomes a plain quote, and block ids and `==highlight==` marks go. Code is sent as written. The note's properties stay in Obsidian; only a `title` property goes along.
+1. It sends the note's text to TextFold as a Markdown document, with Obsidian's own syntax flattened: `[[Note|label]]` becomes `label`, `[[Note]]` becomes `Note`, `%% comments %%` are left out, a callout becomes a plain quote, and block ids and `==highlight==` marks go. Code is sent as written. The note's properties stay in Obsidian; only a `title` property goes along.
+   - **Pictures go along.** A picture of the vault the note embeds (`![[plot.png]]`, `![[plot.png|300]]`, `![[photo.jpg|caption]]`, or `![alt](figures/plot.png)`) is sent inside the text as the picture itself, and TextFold keeps it with the document: PNG, JPEG, GIF and WebP up to 15 MB each. A picture on the web (`![alt](https://…)`) is sent as it is, and TextFold downloads it. SVG pictures, larger files and embeds that lead nowhere are left out, and so are embedded notes and PDFs. The notice after folding says how many pictures went along and which were left out, and why. Changing a picture's file counts as a change of the note.
 2. It records the new document's id in the note's `textfold:` property.
 3. TextFold folds it in the language set under **Settings → TextFold Bridge → Fold this note → Language** (`en` by default). **Folding uses the model you set up in TextFold**, at its cost. Without a model, TextFold stores the note and it reads as written; the sidebar says so.
 

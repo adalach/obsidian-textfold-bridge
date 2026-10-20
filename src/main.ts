@@ -42,7 +42,7 @@ export default class TextFoldBridgePlugin extends Plugin {
 		new Drops(this, this.client, () => this.settings.dropAs).install();
 		installIconLinks(this);
 		this.registerEditorExtension(flashField);
-		this.importer = new Importer(this.app, this.client, () => ({ folder: this.settings.importFolder, byCitekey: this.settings.importNames === "citekey" }));
+		this.importer = new Importer(this.app, this.client, () => ({ location: this.settings.importLocation, folder: this.settings.importFolder, byCitekey: this.settings.importNames === "citekey" }));
 
 		this.registerView(VIEW_TYPE, leaf => new TextFoldNotesView(leaf, this));
 		this.addSettingTab(new BridgeSettingTab(this.app, this));

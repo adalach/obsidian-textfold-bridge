@@ -1,25 +1,35 @@
-// "Import notes": one note per TextFold document in a folder of the vault, its properties naming the document, and its
-// TextFold notes in a block between two marker comments. A re-import finds the note by its `textfold:` property,
-// replaces only that block and the properties it set, and keeps everything written around them.
+// "Import notes": one note per TextFold document, its properties naming the document, and its TextFold notes in a block
+// between two marker comments. A new note goes to the folder set in the settings, the folder of the note open when the
+// import starts, or the vault's own folder. A re-import finds the note imported before wherever it is now (its
+// `textfold:` property and the importer's block), replaces only that block and the properties it set, and keeps
+// everything written around them: a document never gets a second note.
 import { App, FuzzyMatch, FuzzySuggestModal, Notice, TFile, normalizePath } from "obsidian";
 import type { TextFoldClient } from "./client";
 import { Doc, yearOf } from "./doc";
 import { buildLink } from "./links";
 import { Paper } from "./notes";
-import { noteFileName, notesBlock, replaceBlock } from "./notesMarkdown";
+import { BLOCK_START, ImportLocation, importTarget, isImportedNote, noteFileName, notesBlock, replaceBlock } from "./notesMarkdown";
 
 export interface ImportOptions {
+	location: ImportLocation;
 	folder: string;
 	byCitekey: boolean; // name the notes by citekey when TextFold lists one
 }
 
 type Outcome = { id: string; file?: TFile; result: "new" | "updated" | "unchanged" | "missing" | "failed"; error?: string };
 
+const VERB = { new: "Created", updated: "Updated", unchanged: "Unchanged:" } as const;
+
 export class Importer {
 	constructor(private app: App, private client: TextFoldClient, private options: () => ImportOptions) {}
 
-	/** Import these documents' notes, one at a time, and say in one notice what happened. */
-	async importPapers(ids: string[]): Promise<TFile[]> {
+	/** Import these documents' notes, one at a time, and say in one notice what happened. `current` is the note the
+	 *  import starts from (the sidebar's note), else the active one. */
+	async importPapers(ids: string[], current?: TFile | null): Promise<TFile[]> {
+		const opts = this.options();
+		const from = current !== undefined ? current : this.app.workspace.getActiveFile();
+		const note = from && from.extension === "md" ? from : null;
+		const target = importTarget(opts.location, opts.folder, opts.location === "current" ? (note?.parent?.path ?? null) : null);
 		let papers: Paper[] = [];
 		try {
 			papers = await this.client.papers();
@@ -29,23 +39,21 @@ export class Importer {
 		}
 		const byId = new Map(papers.map(p => [p.id, p]));
 		const out: Outcome[] = [];
-		for (const id of ids) out.push(await this.importOne(id, byId.get(id)));
+		for (const id of ids) out.push(await this.importOne(id, byId.get(id), target.folder));
 		const files = out.flatMap(o => (o.file ? [o.file] : []));
-		const count = (r: Outcome["result"]) => out.filter(o => o.result === r).length;
-		const parts = [["new", count("new")], ["updated", count("updated")], ["unchanged", count("unchanged")], ["not in TextFold", count("missing")], ["failed", count("failed")]]
-			.filter(([, n]) => n)
-			.map(([w, n]) => `${n} ${w}`);
-		const where = files.length === 1 ? files[0].path : this.folder();
-		const failed = out.find(o => o.error);
-		new Notice(`TextFold notes imported into ${where}: ${parts.join(", ") || "nothing"}.${failed ? ` ${failed.error}` : ""}`, 8000);
+		const lines = out.flatMap(o => (o.file && (o.result === "new" || o.result === "updated" || o.result === "unchanged") ? [`${VERB[o.result]} ${o.file.basename} in ${where(o.file)}`] : []));
+		const shown = lines.slice(0, 4);
+		if (lines.length > shown.length) shown.push(`and ${lines.length - shown.length} more`);
+		const missing = out.filter(o => o.result === "missing").length;
+		if (missing) shown.push(`${missing} not in TextFold`);
+		const failed = out.filter(o => o.result === "failed");
+		if (failed.length) shown.push(`${failed.length} failed: ${failed[0].error ?? ""}`);
+		if (target.fallback && out.some(o => o.result === "new")) shown.push(`No note was open, so new notes went to ${target.folder}.`);
+		new Notice(shown.join("\n") || "Nothing imported.", 8000);
 		return files;
 	}
 
-	private folder(): string {
-		return normalizePath(this.options().folder.trim() || "TextFold");
-	}
-
-	private async importOne(id: string, paper: Paper | undefined): Promise<Outcome> {
+	private async importOne(id: string, paper: Paper | undefined, folder: string): Promise<Outcome> {
 		try {
 			const nf = await this.client.notes(id);
 			if (!nf) return { id, result: "missing" };
@@ -65,7 +73,7 @@ export class Importer {
 				citekey: paper?.citekey,
 				link: buildLink({ paper: id }),
 			};
-			const existing = this.findImported(id);
+			const existing = await this.findImported(id, folder);
 			if (existing) {
 				const text = await this.app.vault.read(existing);
 				const next = replaceBlock(text, block);
@@ -74,7 +82,7 @@ export class Importer {
 				const propsChanged = await this.setProps(existing, props);
 				return { id, file: existing, result: changed || propsChanged ? "updated" : "unchanged" };
 			}
-			const file = await this.app.vault.create(await this.freePath(noteFileName(title, paper?.citekey, this.options().byCitekey), id), `${block}\n`);
+			const file = await this.app.vault.create(await this.freePath(noteFileName(title, paper?.citekey, this.options().byCitekey), id, folder), `${block}\n`);
 			await this.setProps(file, props);
 			return { id, file, result: "new" };
 		} catch (e) {
@@ -82,21 +90,25 @@ export class Importer {
 		}
 	}
 
-	/** The note imported before for this document: in the import folder, with this id as its `textfold:` property. */
-	private findImported(id: string): TFile | undefined {
-		const prefix = `${this.folder()}/`;
-		return this.app.vault.getMarkdownFiles().find(f => f.path.startsWith(prefix) && this.app.metadataCache.getFileCache(f)?.frontmatter?.textfold === id);
+	/** The note imported before for this document, anywhere in the vault (it may have been moved): one whose
+	 *  `textfold:` property is the id and that holds the importer's block. One in the target folder first. */
+	private async findImported(id: string, folder: string): Promise<TFile | undefined> {
+		const prop = (f: TFile): unknown => this.app.metadataCache.getFileCache(f)?.frontmatter?.textfold;
+		const named = this.app.vault.getMarkdownFiles().filter(f => isImportedNote(prop(f), BLOCK_START, id)); // the property first: no file read
+		const found: TFile[] = [];
+		for (const f of named) if (isImportedNote(prop(f), await this.app.vault.cachedRead(f), id)) found.push(f);
+		return found.find(f => (f.parent?.path === "/" ? "" : f.parent?.path) === folder) ?? found[0];
 	}
 
-	private async freePath(name: string, id: string): Promise<string> {
-		const folder = this.folder();
-		if (!this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
+	private async freePath(name: string, id: string, folder: string): Promise<string> {
+		if (folder && !this.app.vault.getAbstractFileByPath(folder)) await this.app.vault.createFolder(folder);
+		const at = (file: string) => normalizePath(folder ? `${folder}/${file}` : file);
 		for (const candidate of [name, `${name} (${id})`]) {
-			const path = normalizePath(`${folder}/${candidate}.md`);
+			const path = at(`${candidate}.md`);
 			if (!this.app.vault.getAbstractFileByPath(path)) return path;
 		}
 		for (let i = 2; ; i++) {
-			const path = normalizePath(`${folder}/${name} (${id}) ${i}.md`);
+			const path = at(`${name} (${id}) ${i}.md`);
 			if (!this.app.vault.getAbstractFileByPath(path)) return path;
 		}
 	}
@@ -154,4 +166,10 @@ export class ImportPicker extends FuzzySuggestModal<Paper | typeof ALL> {
 	onChooseItem(p: Paper | typeof ALL): void {
 		this.pick(p === ALL ? this.withNotes().map(x => x.id) : [p.id]);
 	}
+}
+
+/** "Research/Convex", or "the vault folder" for a note at the top. */
+function where(file: TFile): string {
+	const p = file.parent?.path ?? "";
+	return p && p !== "/" ? p : "the vault folder";
 }

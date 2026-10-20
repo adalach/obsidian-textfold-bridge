@@ -124,3 +124,23 @@ export function noteFileName(title: string, citekey: string | undefined, byCitek
 function safeName(s: string): string {
 	return s.replace(/[\\/:*?"<>|#^[\]]/g, " ").replace(/\s+/g, " ").trim().replace(/^\.+/, "");
 }
+
+/** Where "Import notes" puts a new note: the folder set in the settings, the folder of the note open when the import
+ *  starts, or the vault's own folder. */
+export type ImportLocation = "folder" | "current" | "root";
+
+/** The folder for new imported notes ("" is the vault's own); `fallback` when it was to be the current note's folder
+ *  but no note was open, so the folder setting is used. */
+export function importTarget(location: ImportLocation, folderSetting: string, currentFolder: string | null): { folder: string; fallback: boolean } {
+	const fixed = folderSetting.trim().replace(/^\/+|\/+$/g, "") || "TextFold";
+	if (location === "root") return { folder: "", fallback: false };
+	if (location === "current") return currentFolder === null ? { folder: fixed, fallback: true } : { folder: currentFolder === "/" ? "" : currentFolder, fallback: false };
+	return { folder: fixed, fallback: false };
+}
+
+/** Whether a note is the one imported for this document: its `textfold` property is the id, and it holds the
+ *  importer's block. A note of one's own that only names the document is not. */
+export function isImportedNote(textfold: unknown, text: string, id: string): boolean {
+	const v = typeof textfold === "number" ? String(textfold) : textfold;
+	return v === id && text.includes(BLOCK_START);
+}

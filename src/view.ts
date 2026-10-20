@@ -427,7 +427,7 @@ export class TextFoldNotesView extends ItemView {
 		else add(ICON, "Open in TextFold", () => void this.plugin.opener.open(link));
 		add("copy", "Copy link", () => void this.copy(markdownLink(label, link)));
 		add("text-cursor-input", "Insert link at the cursor", () => this.insert(markdownLink(truncate(label, 80), link)));
-		if (importId) add("download", "Import its notes into the vault", () => void this.plugin.importer.importPapers([importId]));
+		if (importId) add("download", "Import its notes into the vault", () => void this.plugin.importer.importPapers([importId], this.file));
 	}
 
 	private async importAll(): Promise<void> {
@@ -436,7 +436,7 @@ export class TextFoldNotesView extends ItemView {
 			new Notice(this.reachable ? "No TextFold document is listed." : "TextFold is not reachable.");
 			return;
 		}
-		await this.plugin.importer.importPapers(ids);
+		await this.plugin.importer.importPapers(ids, this.file);
 	}
 
 	private async copy(text: string): Promise<void> {

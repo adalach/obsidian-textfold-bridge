@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DocIndex, parseDoc, sectionName, unitText, yearOf } from "../src/doc";
 import { parseNotes } from "../src/notes";
-import { BLOCK_END, BLOCK_START, answerMarkdown, flipName, groupNotes, noteFileName, notesBlock, replaceBlock } from "../src/notesMarkdown";
+import { BLOCK_END, BLOCK_START, answerMarkdown, flipName, groupNotes, importTarget, isImportedNote, noteFileName, notesBlock, replaceBlock } from "../src/notesMarkdown";
 
 // the shape of GET /api/doc/<id> (TextFold's docs/format.md), with made-up text
 const docJson = {
@@ -156,3 +156,34 @@ describe("noteFileName and flipName", () => {
 		expect(flipName("Chen Xia")).toBe("Chen Xia");
 	});
 });
+
+describe("where an imported note goes", () => {
+	it("uses the folder setting, the current note's folder or the vault's own", () => {
+		expect(importTarget("folder", "TextFold", "Research/Convex")).toEqual({ folder: "TextFold", fallback: false });
+		expect(importTarget("folder", " /Papers/TextFold/ ", null)).toEqual({ folder: "Papers/TextFold", fallback: false });
+		expect(importTarget("current", "TextFold", "Research/Convex")).toEqual({ folder: "Research/Convex", fallback: false });
+		expect(importTarget("current", "TextFold", "/")).toEqual({ folder: "", fallback: false });
+		expect(importTarget("root", "TextFold", "Research/Convex")).toEqual({ folder: "", fallback: false });
+	});
+
+	it("falls back to the folder setting when no note is open", () => {
+		expect(importTarget("current", "TextFold", null)).toEqual({ folder: "TextFold", fallback: true });
+		expect(importTarget("current", "", null)).toEqual({ folder: "TextFold", fallback: true });
+	});
+});
+
+describe("isImportedNote", () => {
+	const imported = `Mine.\n\n${BLOCK_START}\n# Title\n${BLOCK_END}\n`;
+
+	it("knows the importer's note by its property and its block", () => {
+		expect(isImportedNote("pdf-357ae69fe0759131", imported, "pdf-357ae69fe0759131")).toBe(true);
+		expect(isImportedNote(2602.07369, imported, "2602.07369")).toBe(true);
+	});
+
+	it("leaves alone a note of one's own that names the document, and another document's note", () => {
+		expect(isImportedNote("pdf-357ae69fe0759131", "My notes on the zoner.", "pdf-357ae69fe0759131")).toBe(false);
+		expect(isImportedNote("2602.07369", imported, "pdf-357ae69fe0759131")).toBe(false);
+		expect(isImportedNote(["pdf-357ae69fe0759131"], imported, "pdf-357ae69fe0759131")).toBe(false);
+	});
+});
+

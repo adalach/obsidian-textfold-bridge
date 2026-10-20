@@ -2,6 +2,7 @@
 // and where imported notes go.
 import { App, PluginSettingTab, Setting, SettingDefinitionItem, debounce } from "obsidian";
 import type { DropMode } from "./drag";
+import type { ImportLocation } from "./notesMarkdown";
 import type TextFoldBridgePlugin from "./main";
 import { DEFAULT_URL, Resolved, loopbackUrl } from "./server";
 
@@ -13,6 +14,7 @@ export interface BridgeSettings {
 	hoverPreviews: boolean;
 	dropAs: DropMode; // what a TextFold item dropped or pasted into a note becomes
 	foldLang: string; // the language "Fold this note" folds in
+	importLocation: ImportLocation; // where a new imported note goes
 	importFolder: string;
 	importNames: "title" | "citekey";
 	sidebarTab: "note" | "textfold"; // the sidebar shows the note's citations, or the documents' notes in TextFold
@@ -27,6 +29,7 @@ export const DEFAULT_SETTINGS: BridgeSettings = {
 	hoverPreviews: true,
 	dropAs: "callout",
 	foldLang: "en",
+	importLocation: "folder",
 	importFolder: "TextFold",
 	importNames: "title",
 	sidebarTab: "note",
@@ -143,8 +146,19 @@ export class BridgeSettingTab extends PluginSettingTab {
 				heading: "Import notes",
 				items: [
 					{
+						name: "Location for imported notes",
+						desc: "Where a new imported note goes, one per TextFold document. A note imported before is updated where it is.",
+						control: {
+							type: "dropdown",
+							key: "importLocation",
+							defaultValue: DEFAULT_SETTINGS.importLocation,
+							options: { folder: "In the folder specified below", current: "Same folder as current note", root: "Vault folder" },
+						},
+					},
+					{
 						name: "Folder",
-						desc: "Where imported notes go, one per TextFold document.",
+						desc: "The folder for imported notes.",
+						visible: () => s().importLocation === "folder",
 						control: { type: "folder", key: "importFolder", defaultValue: DEFAULT_SETTINGS.importFolder, placeholder: "TextFold" },
 					},
 					{
@@ -171,10 +185,11 @@ export class BridgeSettingTab extends PluginSettingTab {
 		else if (key === "hoverPreviews") s.hoverPreviews = value === true;
 		else if (key === "dropAs") s.dropAs = value === "quote" || value === "link" || value === "icon" ? value : "callout";
 		else if (key === "foldLang") s.foldLang = text || DEFAULT_SETTINGS.foldLang;
+		else if (key === "importLocation") s.importLocation = value === "current" || value === "root" ? value : "folder";
 		else if (key === "importFolder") s.importFolder = text || DEFAULT_SETTINGS.importFolder;
 		else if (key === "importNames") s.importNames = value === "citekey" ? "citekey" : "title";
 		await this.plugin.saveSettings();
-		if (key === "addressMode") this.update();
+		if (key === "addressMode" || key === "importLocation") this.update();
 		if (key === "addressMode" || key === "manualUrl" || key === "sourceFolder") {
 			this.plugin.client.reset();
 			this.recheck();

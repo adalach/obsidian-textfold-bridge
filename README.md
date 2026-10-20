@@ -12,7 +12,7 @@
 - **Hover previews.** Hover a link to see its paragraph (at the link's level, else Takeaway), its section's title and summary, its note, or the paper's title and authors. In Reading view a hover is enough; in the editor hold Cmd (Ctrl on Windows and Linux), as with Obsidian's page previews.
 - **Drops from TextFold.** Drag a paragraph, a section's summary, a note, a conversation or a selection from TextFold's reader into any note, or copy and paste it: it goes in where you drop it, with its title, section and a link back.
 - **Insert link to a TextFold paper.** A command that searches TextFold's documents by title, id or citekey and inserts `[Title](textfold://open?paper=ID)` at the cursor. With text selected, the selection becomes the link's label.
-- **TextFold notes sidebar.** For the note you are in, the TextFold documents it refers to, each with its highlights, comments and Ask conversations, one line per note, under the names of their sections. Hover a line to read the whole note, with the model's answer and the paragraphs it cites. Each line can open TextFold at that note, copy a link to it, or insert the link at the cursor, and can be dragged into a note like an item from TextFold. Open it with the command **Open TextFold notes**.
+- **TextFold sidebar.** For the note you are in, two lists behind a switch at the top. **In this note**: every TextFold citation in the note, one line each with what it cites; a click goes to that place in the note. **In TextFold**: the TextFold documents the note refers to, each with its highlights, comments and Ask conversations under their sections; hover a line to read the whole note with the model's answer, open TextFold at it, copy or insert its link, or drag it into a note. Open the sidebar with the command **Open TextFold notes**.
 - **Fold this note.** Send the note you are writing to TextFold and read it at five levels there. When you edit it later, the sidebar says **Changed since folding** and offers **Refold**.
 - **Import notes from TextFold.** Bring a document's TextFold notes into the vault as a note of its own, and update it later without losing what you wrote in it.
 
@@ -27,6 +27,16 @@ The zoning step follows [Convex Partition Zoner](textfold://open?paper=pdf-357ae
 
 `textfold:` also takes a list of ids. Put an arXiv id in quotes, as above, or YAML may read it as a number and drop a trailing zero.
 
+## Citations in this note
+
+**In this note**, at the top of the sidebar, lists every `textfold://` link in the open note, in reading order: plain links, dropped callouts and quotes, and the ↗ icon links alike. A line shows what the link cites, as TextFold has it (the paragraph or section summary at the link's level, else Takeaway; a note's passage; an Ask's question), or else the link's own words, and on the right the paper's short title. Hover a line to preview it.
+
+- **Click a line** to go to the link in the note: it scrolls into the middle and lights up for a moment, with the cursor on it in Live Preview and Source mode; in Reading view its line and the link light up.
+- **The TextFold icon** on a line (shown on hover) opens TextFold there, as a click on the link would.
+- **By heading · By paper** chooses the grouping: under the note's headings (links before the first heading under the note's title), or by paper, then by the paper's section, in the paper's order. Each group shows its count and folds away with a click. The plugin remembers the choice.
+
+The list follows the note as you edit it and as you switch notes; it asks TextFold again only when the set of cited papers changes.
+
 ## Drops from TextFold
 
 Drag something from TextFold's reader (a paragraph by its handle, a heading, a summary, a chip of the Topic map, a note's card, or selected text) into a note, or copy it and paste. The item goes in at the drop point, as set under **Settings → TextFold Bridge → Drops from TextFold → Dropped TextFold items as**:
@@ -35,13 +45,11 @@ Drag something from TextFold's reader (a paragraph by its handle, a heading, a s
 
   ```markdown
   > [!textfold] Convex Primitive Decomposition › 3 Method
-  > The paragraph, at the level it was dragged at.
-  >
-  > [Open in TextFold](textfold://open?paper=2602.07369&u=S3.p2&level=key)
+  > The paragraph, at the level it was dragged at. [↗](textfold://open?paper=2602.07369&u=S3.p2&level=key)
   ```
 
-  A note shows its passage and then your comment; a conversation its passage, your question in bold and the answer. When the text is the model's words (a Key, Takeaway or Topic level, a summary, an answer), the callout says `[!textfold|written]` and shows "written by the model" after its title. The callout carries TextFold's icon and takes the colour of your theme's "example" callout.
-- **Quote with the link**: the text as a quote, ending in `— [Title › Section](link)`.
+  The callout's last line ends with a `↗` link back, which the plugin draws as TextFold's icon. A note shows its passage and then your comment; a conversation its passage, your question in bold and the answer. When the text is the model's words (a Key, Takeaway or Topic level, a summary, an answer), the callout says `[!textfold|written]` and shows "written by the model" after its title. The callout carries TextFold's icon and takes the colour of your theme's "example" callout.
+- **Quote with the link**: the text as a quote, its last line ending in the `↗` link back (and "written by the model" for the model's words).
 - **Link only**: `[Title › Section](link)` among the words where it was dropped.
 - **Text with a TextFold icon**: just the text, followed by a small TextFold icon that links back:
 
@@ -70,7 +78,7 @@ Refold needs a TextFold with refold in place (newer than 0.10.15).
 **Import notes from TextFold** picks a document, or all documents that have notes; the sidebar's download buttons import the documents shown there. Each document becomes one note in the folder set under **Import notes → Folder** (`TextFold` by default), named by its short title (the part before a colon) or, with **Note names → Citekey**, by its citekey when TextFold has one.
 
 - Properties: `textfold` (the id), `title`, `authors`, `year`, `citekey` when there is one, and `link` (`textfold://open?paper=…`).
-- The notes come between two marker comments, `%% TextFold notes: … %%` and `%% End of TextFold notes %%`, in the style of TextFold's own Markdown export for Obsidian: grouped by section, each highlight a quote with the note's id as its block id (`^n-…`, so other notes can link to it), then your comment and a link back to it in TextFold; each Ask conversation a `[!question]` callout, its citations links to the paragraphs they name.
+- The notes come between two marker comments, `%% TextFold notes: … %%` and `%% End of TextFold notes %%`, in the style of TextFold's own Markdown export for Obsidian: grouped by section, each highlight a quote with the note's id as its block id (`^n-…`, so other notes can link to it), then your comment; each Ask conversation a `[!question]` callout, its citations links to the paragraphs they name. Each note's last line (your comment, else its passage or conversation) ends with a `↗` link back to it in TextFold, drawn as TextFold's icon; the document's own link at the top stays a plain link. A re-import rewrites these lines with the rest of the block.
 - Importing again finds the note by its `textfold` property, replaces only what is between the markers and the properties above, and keeps everything else you wrote in the note and its other properties. An unchanged document leaves the note untouched.
 
 Section names, paragraph previews and the cite labels in imported answers come from TextFold's `GET /api/doc` (newer than 0.10.15); with an older TextFold the plugin works without them.

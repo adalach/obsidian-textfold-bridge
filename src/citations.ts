@@ -184,8 +184,8 @@ export function groupByHeading(cites: Citation[], headings: HeadingPos[], title:
 	return groups;
 }
 
-/** Citations by paper (in the order the note first cites each), then by the paper's sections in the paper's order,
- *  then in reading order. `info` says a citation's paper title and section, when TextFold knows them. */
+/** Citations by paper (in the order the note first cites each), then by the paper's sections in the paper's order
+ *  (citations of the whole paper, or of a place TextFold cannot say, first), then in reading order. `info` says a citation's paper title and section, when TextFold knows them. */
 export function groupByPaper(
 	cites: Citation[],
 	info: (c: Citation) => { title: string; section: { id: string; name: string; place: number } | null },
@@ -205,7 +205,7 @@ export function groupByPaper(
 		if (!s) {
 			s = { key, name: section?.name ?? "", level: 1, items: [] };
 			p.sub!.push(s);
-			places.set(key, section ? section.place : Number.MAX_SAFE_INTEGER);
+			places.set(key, section ? section.place : -Number.MAX_SAFE_INTEGER); // the whole paper first, as TextFold lists it
 		}
 		s.items.push(c);
 	}

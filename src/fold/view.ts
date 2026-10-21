@@ -189,7 +189,7 @@ export class FoldView extends FileView {
 		}
 		await this.readNote(file, run);
 		if (run !== this.run) return;
-		await this.fetch(file, run);
+		await this.loadFold(file, run);
 	}
 
 	private async readNote(file: TFile, run: number): Promise<void> {
@@ -214,7 +214,7 @@ export class FoldView extends FileView {
 		this.rendered = rendered;
 	}
 
-	private async fetch(file: TFile, run: number): Promise<void> {
+	private async loadFold(file: TFile, run: number): Promise<void> {
 		const { client, folds } = this.plugin;
 		const want = this.lang ?? this.plugin.foldLanguage();
 		const r = await client.server();

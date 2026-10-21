@@ -5,7 +5,7 @@
 // Live Preview. Everything else passes through untouched; the wrapper is removed on unload.
 import { Notice, Plugin } from "obsidian";
 import type { TextFoldClient } from "./client";
-import { TextFoldLink, buildLink, parseLink, readerUrl } from "./links";
+import { TextFoldLink, buildLink, forApp, parseLink, readerUrl } from "./links";
 
 type OpenFn = typeof window.open;
 
@@ -70,7 +70,7 @@ export class LinkOpener {
 			return;
 		}
 		if (this.openIn() === "app") {
-			this.nativeOpen(buildLink(link));
+			this.nativeOpen(buildLink(forApp(link, r.version)));
 			return;
 		}
 		if (!r.reachable) {

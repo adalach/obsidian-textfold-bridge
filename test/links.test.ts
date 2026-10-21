@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLink, findPaperIds, levelName, markdownLink, parseLink, readerUrl, withId, withoutId } from "../src/links";
+import { buildLink, findPaperIds, forApp, levelName, markdownLink, parseLink, readerUrl, withId, withoutId } from "../src/links";
 
 describe("parseLink", () => {
 	it("reads every part of a link", () => {
@@ -183,3 +183,22 @@ describe("turns of a conversation (t=)", () => {
 	});
 });
 
+describe("paragraphs TextFold split (u6~2)", () => {
+	it("parses ~ in u and to", () => {
+		expect(parseLink("textfold://open?paper=pdf-4932df23a9594286&u=u6~2&to=u85~3&level=brief")).toMatchObject({ u: "u6~2", to: "u85~3", level: "brief" });
+	});
+	it("gives TextFold's app the paragraph's first part, as no released app takes ~ yet", () => {
+		const link = { paper: "pdf-4932df23a9594286", u: "u6~2", to: "u7~3" };
+		expect(forApp(link, "0.10.22")).toEqual({ paper: "pdf-4932df23a9594286", u: "u6", to: "u7" });
+		expect(forApp(link)).toEqual({ paper: "pdf-4932df23a9594286", u: "u6", to: "u7" });
+		expect(forApp({ paper: "x", u: "u6~2", to: "u6~3" }, "0.10.17")).toEqual({ paper: "x", u: "u6" });
+		expect(forApp({ paper: "2602.07369", u: "S1.p1.1" }, "0.10.22")).toEqual({ paper: "2602.07369", u: "S1.p1.1" });
+	});
+	it("keeps the exact paragraph once the app is known to take ~", () => {
+		const link = { paper: "pdf-4932df23a9594286", u: "u6~2" };
+		expect(forApp(link, "0.10.23", "0.10.23")).toEqual(link);
+		expect(forApp(link, "0.11.0", "0.10.23")).toEqual(link);
+		expect(forApp(link, "0.10.22", "0.10.23")).toEqual({ paper: "pdf-4932df23a9594286", u: "u6" });
+		expect(forApp(link, undefined, "0.10.23")).toEqual({ paper: "pdf-4932df23a9594286", u: "u6" });
+	});
+});

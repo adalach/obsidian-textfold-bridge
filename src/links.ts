@@ -28,7 +28,7 @@ export interface TextFoldLink {
 // TextFold's document ids: arXiv ids, md-…, pdf-…, zotero-…, pmc…, wiki-…; its routes accept [\w.-]+
 const PAPER_ID = /^[\w.-]{1,120}$/;
 const NOTE_ID = /^[\w-]{1,80}$/;
-const UNIT_ID = /^[\w.-]{1,200}$/; // as TextFold's links.js checks u and to
+const UNIT_ID = /^[\w.~-]{1,200}$/; // a paragraph's id; the later parts of a paragraph TextFold split are u6~2, u6~3
 const LANG = /^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8})*$/;
 
 export function isPaperId(id: string): boolean {
@@ -131,4 +131,28 @@ export function withoutId(value: unknown, id: string): unknown {
 	if (!Array.isArray(value)) return value === id ? undefined : value;
 	const left = (value as unknown[]).filter(x => x !== id);
 	return left.length === 0 ? undefined : left.length === 1 ? left[0] : left;
+}
+
+// The first TextFold whose app takes "~" in a paragraph's id, once one does (proposed upstream); until then null.
+const APP_TAKES_TILDE_FROM: string | null = null;
+
+/** Whether TextFold's version a.b.c is at least min; an unparsable one is not. */
+function atLeast(version: string, min: string): boolean {
+	const v = version.split(".").map(Number), m = min.split(".").map(Number);
+	if (v.length !== 3 || v.some(Number.isNaN)) return false;
+	for (let i = 0; i < 3; i++) if (v[i] !== m[i]) return v[i] > m[i];
+	return true;
+}
+
+/** The link as TextFold's app takes it. Its link check refuses a paragraph id with "~" (u6~2, the later parts of a
+ *  paragraph TextFold split) and then opens nothing (up to 0.10.22 at least), so for the app such a link names the
+ *  paragraph's first part (u6), just above, unless the app is known to take "~". The reader page takes it as it is. */
+export function forApp(link: TextFoldLink, version?: string, takesTildeFrom: string | null = APP_TAKES_TILDE_FROM): TextFoldLink {
+	if (takesTildeFrom && version && atLeast(version, takesTildeFrom)) return link;
+	const base = (id?: string) => id?.replace(/~\d+$/, "");
+	const out: TextFoldLink = { ...link };
+	if (link.u) out.u = base(link.u);
+	if (link.to) out.to = base(link.to);
+	if (out.to && out.to === out.u) delete out.to;
+	return out;
 }

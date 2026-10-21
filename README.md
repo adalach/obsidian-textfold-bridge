@@ -157,6 +157,7 @@ A TextFold run from a clone of its repository writes `server.json` in the clone'
 - **Your vault's files.** It reads the note that is open (for the sidebar and its citations) and the notes you fold or export, with the pictures they embed. It writes only where you ask: a drop or paste into a note, the `textfold` property of a note you fold or export, and the notes **Import notes** writes. To find the note it imported earlier for a document, wherever you moved it, **Import notes** goes through the list of Markdown notes and reads their properties (it looks for its own `textfold` property and marker comments); it does this only when you import.
 - **Clipboard.** **Copy link** in the sidebar writes the link to the clipboard, only when you click it. A paste from TextFold is read from the paste you make, as Obsidian hands it over; the plugin never reads the clipboard on its own.
 - It sends no telemetry and contacts no other server.
+- **Links you click.** A `textfold://` link opens in TextFold's app, or TextFold's reader page in your browser (**Open links in**); any other link in a folded note opens as Obsidian opens links.
 - Text from TextFold is shown through Obsidian's Markdown renderer or as plain text, never inserted as HTML.
 
 ## License

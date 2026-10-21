@@ -8,26 +8,9 @@
 
 ## Which TextFold
 
-Most of what the plugin does needs changes to TextFold that are not in a TextFold release yet. They are proposed to TextFold in [chenxiachan/textfold#32](https://github.com/chenxiachan/textfold/issues/32), one change each, and until they are merged you can try them all together from the branch [`textfold-bridge-all`](https://github.com/adalach/paperfold/tree/textfold-bridge-all) of a fork of TextFold:
+**TextFold 0.10.18 or later** has everything the plugin uses: the desktop app writes `server.json` and opens `textfold://` links, the reader's items drag into Obsidian, notes refold in place, and the server reports documents, citekeys and the reading language. [Download TextFold](https://chenxiachan.github.io/textfold/#download), or run it from Python with `python3 -m pip install textfold` and `python3 -m textfold serve`. These parts of TextFold came from this plugin's proposals ([chenxiachan/textfold#32](https://github.com/chenxiachan/textfold/issues/32), merged in #33 to #39).
 
-```bash
-git clone --branch textfold-bridge-all https://github.com/adalach/paperfold.git textfold-bridge
-cd textfold-bridge && python3 -m pip install -r requirements.txt && python3 -m textfold serve
-```
-
-On a Mac you can also build TextFold's app from it (`npm install && npm run pack:mac` in `desktop/`); that app opens `textfold://` links itself. A build made this way is not signed, so it is for your own computer.
-
-| Works with an official TextFold (0.10.17) | Needs the branch |
-| --- | --- |
-| Finding TextFold run with `python3 -m textfold serve` (port 3017) | Finding TextFold's desktop app (`server.json`) |
-| `textfold://` links to a paper, paragraph, note or level, opened in the browser | Links opened in the TextFold app; links to a section, a range of paragraphs or one turn of a conversation |
-| Insert link to a TextFold paper (by title or id) | Citekeys in the picker |
-| The sidebar's TextFold notes | Section names and hover previews of paragraphs |
-| Export this note to TextFold (the first fold) | Refold in place; Fold this note inside Obsidian |
-| Import notes (without section names) | Dragging from TextFold's reader into a note |
-| | TextFold's reading language as the default |
-
-With an official TextFold the plugin does what it can: hover previews show less, the language falls back to English, and Refold makes a new TextFold document instead of replacing the old one, so comments made on the old one stay there.
+With an older TextFold the plugin does what it can: it finds a TextFold run with `python3 -m textfold serve` (port 3017), opens links to a paper, paragraph, note or level in the browser, inserts links, lists TextFold's notes in the sidebar, exports notes and imports their TextFold notes. Hover previews then show less, the language falls back to English, dragging from the reader is not there, and Refold makes a new TextFold document instead of replacing the old one, so comments made on the old one stay there.
 
 ## What it does
 
@@ -117,7 +100,7 @@ Run **Export this note to TextFold** (or the upload button in the sidebar) in a 
 
 The sidebar shows the fold's progress, then **Folded** with **Fold in Obsidian** and **Open in TextFold**; the notice at the end offers both too. The plugin keeps a hash of the text it sent, so after an edit the sidebar shows **Changed since folding** and **Refold**. A refold puts the new text in place of the old under the same id: your highlights and questions on the note stay, TextFold finds their passages again in the new text, and asks its model only for the sections that changed. A note whose passage is gone after the edit stays, marked **Passage not found after the edit**. If TextFold is still folding the note, Refold says so and does nothing; if TextFold no longer has the document, the plugin takes the id out of the note's property, and the next fold or export makes a new document.
 
-Refold needs a TextFold with refold in place (see [Which TextFold](#which-textfold)).
+Refold in place needs TextFold 0.10.18 or later.
 
 ## Import notes
 
@@ -133,7 +116,7 @@ A document never gets a second note: before creating one, the plugin looks throu
 - The notes come between two marker comments, `%% TextFold notes: … %%` and `%% End of TextFold notes %%`, in the style of TextFold's own Markdown export for Obsidian: grouped by section, each highlight a quote with the note's id as its block id (`^n-…`, so other notes can link to it), then your comment; each Ask conversation a `[!question]` callout, its citations links to the paragraphs they name. Each note's last line (your comment, else its passage or conversation) ends with a `↗` link back to it in TextFold, drawn as TextFold's icon; the document's own link at the top stays a plain link. A re-import rewrites these lines with the rest of the block.
 - Importing again finds the note by its `textfold` property and the markers, wherever it is in the vault, replaces only what is between the markers and the properties above, and keeps everything else you wrote in the note and its other properties. An unchanged document leaves the note untouched.
 
-Section names, paragraph previews and the cite labels in imported answers come from TextFold's `GET /api/doc` (see [Which TextFold](#which-textfold)); without it the plugin works without them.
+Section names, paragraph previews and the cite labels in imported answers come from TextFold's `GET /api/doc` (TextFold 0.10.18 or later); without it the plugin works without them.
 
 ## Links
 
@@ -149,7 +132,7 @@ Before it opens a link, the plugin asks the running TextFold whether it has the 
 **Settings → TextFold Bridge → Links → Open links in** chooses where a link opens:
 
 - **Browser** (default): TextFold's reader page on the running TextFold, in your default browser.
-- **TextFold app**: Obsidian hands the `textfold://` link to the system, for TextFold's desktop app to open. Only a packaged TextFold app that handles these links registers itself for them (one built from the branch in [Which TextFold](#which-textfold) does), so keep **Browser** unless you have one. Obsidian asks once before it opens links of a new kind; tick **Always open** there to stop the question.
+- **TextFold app**: Obsidian hands the `textfold://` link to the system, for TextFold's desktop app to open. TextFold's desktop app registers itself for them from 0.10.18 on; with an older app, or with TextFold run from Python, keep **Browser**. Obsidian asks once before it opens links of a new kind; tick **Always open** there to stop the question.
 
 ## Finding TextFold
 

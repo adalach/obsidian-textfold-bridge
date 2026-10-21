@@ -1,9 +1,11 @@
 // A textfold:// link whose label is exactly ↗ (`<text> [↗](textfold://…)`, as "Text with a TextFold icon" drops write
 // it) is drawn as TextFold's icon, inline at the text's height. In Reading view a post-processor turns the rendered <a>
 // into the icon; the plugin's click handler opens it (with the missing-paper check) and its hover handler previews it.
-// In Live Preview it adds one mark decoration, on the ↗, and nothing else: Obsidian renders the link as it always does
+// In Live Preview it adds one mark decoration, on the ↗, and a class on the arrow widget after it: Obsidian renders the link as it always does
 // (its label shown, the address hidden, its own click handling, which the plugin's window.open wrapper takes for
-// textfold:), styles.css draws the marked ↗ as the logo and hides the external-link arrow Obsidian puts after it. The
+// textfold:), styles.css draws the marked ↗ as the logo and hides the external-link arrow Obsidian puts after it, a
+// widget of its own: after each update the plugin gives the arrow that follows an icon in its line the class
+// tfb-no-arrow (CodeMirror ignores changes in a widget's DOM), since CSS could only find it with :has. The
 // line's DOM stays Obsidian's. (Until 0.5.0 a replace widget at the highest precedence stood in for the whole link,
 // next to Obsidian's own widgets for it; a freshly dropped callout was seen drawn one letter per row after the first
 // click into it, which switches it to its source lines.) While the cursor is in the link, it shows as written.
@@ -81,12 +83,36 @@ const iconLinkPlugin = ViewPlugin.fromClass(
 
 		constructor(view: EditorView) {
 			this.decorations = build(view);
+			markArrowsSoon(view);
 		}
 
 		update(u: ViewUpdate): void {
 			if (u.docChanged || u.viewportChanged || u.selectionSet || u.startState.field(editorLivePreviewField, false) !== u.state.field(editorLivePreviewField, false))
 				this.decorations = build(u.view);
+			markArrowsSoon(u.view);
 		}
 	},
 	{ decorations: v => v.decorations },
 );
+
+/** After the view is drawn: the external-link arrow widget Obsidian puts after a link gets tfb-no-arrow when that link
+ *  is a TextFold icon, and loses it otherwise (widgets are reused as the text changes). In reading order per line, a
+ *  link's arrow is the first one after it. */
+function markArrowsSoon(view: EditorView): void {
+	view.requestMeasure({
+		key: "tfb-no-arrow",
+		read: () => null,
+		write: () => {
+			for (const line of Array.from(view.contentDOM.querySelectorAll(".cm-line"))) {
+				let afterIcon = false;
+				for (const el of Array.from(line.querySelectorAll(".cm-link, .cm-url.external-link"))) {
+					if (el.classList.contains("cm-link")) afterIcon = el.querySelector(".tfb-lp-icon") !== null;
+					else {
+						el.classList.toggle("tfb-no-arrow", afterIcon);
+						afterIcon = false;
+					}
+				}
+			}
+		},
+	});
+}

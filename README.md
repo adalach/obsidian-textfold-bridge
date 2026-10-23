@@ -6,6 +6,10 @@
 
 **You need TextFold installed and running.** This plugin does not install, start or update TextFold.
 
+## Install
+
+In Obsidian, open **Settings → Community plugins → Browse**, search for **TextFold Bridge**, then install and enable it ([its page in the community plugins](https://community.obsidian.md/plugins/textfold-bridge)). It works on desktop only. To try a version before it reaches the community plugins, install it with [BRAT](https://github.com/TfTHacker/obsidian42-brat) from `adalach/obsidian-textfold-bridge`, or copy `main.js`, `manifest.json` and `styles.css` from a [release](https://github.com/adalach/obsidian-textfold-bridge/releases) into `<vault>/.obsidian/plugins/textfold-bridge/`.
+
 ## Which TextFold
 
 **TextFold 0.10.18 or later** has everything the plugin uses: the desktop app writes `server.json` and opens `textfold://` links, the reader's items drag into Obsidian, notes refold in place, and the server reports documents, citekeys and the reading language. [Download TextFold](https://chenxiachan.github.io/textfold/#download), or run it from Python with `python3 -m pip install textfold` and `python3 -m textfold serve`. These parts of TextFold came from this plugin's proposals ([chenxiachan/textfold#32](https://github.com/chenxiachan/textfold/issues/32), merged in #33 to #39).

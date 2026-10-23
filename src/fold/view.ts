@@ -877,7 +877,7 @@ export class FoldView extends FileView {
 		const body = pop.hoverEl.createDiv("tfb-hover-body");
 		if (mk) {
 			for (const x of this.notesBy.get(mk.dataset.mk ?? "") ?? []) {
-				body.createDiv({ cls: "tfb-hover-meta", text: `${x.kind === "ask" ? "Ask" : x.text ? "Note" : "Highlight"} · ^${x.id}` });
+				body.createDiv({ cls: "tfb-hover-meta", text: x.kind === "ask" ? "Ask" : x.text ? "Note" : "Highlight" });
 				if (x.quote) body.createDiv({ cls: "tfb-card-quote", text: x.quote });
 				if (x.text) body.createDiv({ cls: "tfb-card-text", text: x.text });
 				const turn = x.kind === "ask" ? x.thread.find(tt => tt.a) : undefined;

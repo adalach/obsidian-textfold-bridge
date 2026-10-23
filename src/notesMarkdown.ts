@@ -1,6 +1,6 @@
 // TextFold's notes on a document as Markdown in the vault ("Import notes"), in the style of TextFold's own export for
-// Obsidian (notesMarkdown in its reader.js): grouped by section in reading order, each highlight a quote with the note's
-// id as its block id (^n-…), then the reader's comment and a link back to the note in TextFold; a conversation as a
+// Obsidian (notesMarkdown in its reader.js), without its block ids and credit line: grouped by section in reading order,
+// each highlight a quote, then the reader's comment and a link back to the note in TextFold; a conversation as a
 // [!question] callout. The notes go between two marker comments, so a re-import replaces only them and keeps what was
 // written around them. Pure functions without runtime imports from obsidian; test/notesMarkdown.test.ts covers them.
 import { Doc, DocIndex, sectionName } from "./doc";
@@ -74,7 +74,7 @@ export function notesBlock(nf: NotesFile, doc: Doc | null, source?: { label: str
 		for (const n of g.notes) out.push(...noteMarkdown(n, paper, index), "");
 	}
 	if (!nf.notes.length) out.push("*No notes in TextFold yet.*", "");
-	out.push("---", "", "*Made with [TextFold](https://github.com/chenxiachan/textfold)*", "", BLOCK_END);
+	out.push(BLOCK_END);
 	return out.join("\n");
 }
 
@@ -95,7 +95,7 @@ function noteMarkdown(n: Note, paper: string, index: DocIndex | null): string[] 
 	const comment = n.text.trim();
 	// the link back ends the note's last line: its comment, else its passage or conversation
 	if (!comment && quoteLines.length) quoteLines[quoteLines.length - 1] += ` ${icon}`;
-	const out = [...quoteLines, "", `^${n.id}`, ""];
+	const out = [...quoteLines, ""];
 	if (n.lost) out.push("*Passage not found after the edit.*", "");
 	if (comment) out.push(`${comment} ${icon}`, "");
 	else if (!quoteLines.length) out.push(icon, "");

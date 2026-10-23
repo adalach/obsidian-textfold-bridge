@@ -87,20 +87,20 @@ describe("notesBlock", () => {
 		expect(lines.slice(2, 7)).toEqual(["# Zoning: a short note", "", "Agata Dalach · zoning.md", "", "[Open in TextFold](textfold://open?paper=md-zoning-1234abcd)"]);
 	});
 
-	it("writes a highlight as a quote with its block id, then the comment ending in the link back", () => {
+	it("writes a highlight as a quote, then the comment ending in the link back", () => {
 		const at = lines.indexOf("> We merge.");
-		expect(lines.slice(at, at + 5)).toEqual(["> We merge.", "", "^n-late", "", "Check this. [↗](textfold://open?paper=md-zoning-1234abcd&u=p-cccc3333&n=n-late)"]);
+		expect(lines.slice(at, at + 3)).toEqual(["> We merge.", "", "Check this. [↗](textfold://open?paper=md-zoning-1234abcd&u=p-cccc3333&n=n-late)"]);
 	});
 
 	it("ends a highlight without a comment with the link back on its passage", () => {
 		const at = lines.indexOf("> We partition. [↗](textfold://open?paper=md-zoning-1234abcd&u=p-bbbb2222&n=n-early)");
-		expect(lines.slice(at, at + 3)).toEqual(["> We partition. [↗](textfold://open?paper=md-zoning-1234abcd&u=p-bbbb2222&n=n-early)", "", "^n-early"]);
+		expect(lines.slice(at, at + 3)).toEqual(["> We partition. [↗](textfold://open?paper=md-zoning-1234abcd&u=p-bbbb2222&n=n-early)", "", "> We merge."]);
 		expect(block).not.toContain("[Open in TextFold](textfold://open?paper=md-zoning-1234abcd&");
 	});
 
 	it("writes a conversation as a question callout, citations as links", () => {
 		const at = lines.indexOf("> [!question] Why convex?");
-		expect(lines.slice(at, at + 9)).toEqual([
+		expect(lines.slice(at, at + 8)).toEqual([
 			"> [!question] Why convex?",
 			">",
 			"> Speed ([Zoning](textfold://open?paper=md-zoning-1234abcd&u=p-aaaa1111)) and taste (inference).",
@@ -109,13 +109,18 @@ describe("notesBlock", () => {
 			">",
 			"> → For speed. [↗](textfold://open?paper=md-zoning-1234abcd&n=n-ask)",
 			"",
-			"^n-ask",
 		]);
 	});
 
 	it("flags a note whose passage was lost in an edit", () => {
-		const at = lines.indexOf("^n-lost");
+		const at = lines.indexOf("> old words [↗](textfold://open?paper=md-zoning-1234abcd&u=p-aaaa1111&n=n-lost)");
 		expect(lines[at + 2]).toBe("*Passage not found after the edit.*");
+	});
+
+	it("writes no block ids and no credit line", () => {
+		expect(lines.filter(l => l.startsWith("^"))).toEqual([]);
+		expect(block).not.toContain("Made with");
+		expect(lines[lines.length - 3]).toBe("Check this. [↗](textfold://open?paper=md-zoning-1234abcd&u=p-cccc3333&n=n-late)");
 	});
 
 	it("groups by section with headings", () => {

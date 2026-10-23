@@ -187,7 +187,13 @@ describe("paragraphs TextFold split (u6~2)", () => {
 	it("parses ~ in u and to", () => {
 		expect(parseLink("textfold://open?paper=pdf-4932df23a9594286&u=u6~2&to=u85~3&level=brief")).toMatchObject({ u: "u6~2", to: "u85~3", level: "brief" });
 	});
-	it("gives TextFold's app the paragraph's first part, as no released app takes ~ yet", () => {
+	it("keeps the exact part for TextFold 0.10.26 and later, which take ~", () => {
+		const link = { paper: "pdf-4932df23a9594286", u: "u6~2", to: "u7~3" };
+		expect(forApp(link, "0.10.26")).toEqual(link);
+		expect(forApp(link, "0.10.27")).toEqual(link);
+		expect(forApp(link, "0.11.0")).toEqual(link);
+	});
+	it("gives an older or unknown TextFold app the paragraph's first part", () => {
 		const link = { paper: "pdf-4932df23a9594286", u: "u6~2", to: "u7~3" };
 		expect(forApp(link, "0.10.22")).toEqual({ paper: "pdf-4932df23a9594286", u: "u6", to: "u7" });
 		expect(forApp(link)).toEqual({ paper: "pdf-4932df23a9594286", u: "u6", to: "u7" });

@@ -133,8 +133,8 @@ export function withoutId(value: unknown, id: string): unknown {
 	return left.length === 0 ? undefined : left.length === 1 ? left[0] : left;
 }
 
-// The first TextFold whose app takes "~" in a paragraph's id, once one does (proposed upstream); until then null.
-const APP_TAKES_TILDE_FROM: string | null = null;
+// The first TextFold whose app takes "~" in a paragraph's id (chenxiachan/textfold#42, released in 0.10.26).
+const APP_TAKES_TILDE_FROM: string | null = "0.10.26";
 
 /** Whether TextFold's version a.b.c is at least min; an unparsable one is not. */
 function atLeast(version: string, min: string): boolean {
@@ -145,8 +145,8 @@ function atLeast(version: string, min: string): boolean {
 }
 
 /** The link as TextFold's app takes it. Its link check refuses a paragraph id with "~" (u6~2, the later parts of a
- *  paragraph TextFold split) and then opens nothing (up to 0.10.22 at least), so for the app such a link names the
- *  paragraph's first part (u6), just above, unless the app is known to take "~". The reader page takes it as it is. */
+ *  paragraph TextFold split) before 0.10.26 and then opens nothing, so for such an app, or one whose version is
+ *  unknown (not running yet), the link names the paragraph's first part (u6), just above. The reader page takes "~". */
 export function forApp(link: TextFoldLink, version?: string, takesTildeFrom: string | null = APP_TAKES_TILDE_FROM): TextFoldLink {
 	if (takesTildeFrom && version && atLeast(version, takesTildeFrom)) return link;
 	const base = (id?: string) => id?.replace(/~\d+$/, "");

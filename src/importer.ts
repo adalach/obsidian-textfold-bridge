@@ -3,7 +3,7 @@
 // import starts, or the vault's own folder. A re-import finds the note imported before wherever it is now (its
 // `textfold:` property and the importer's block), replaces only that block and the properties it set, and keeps
 // everything written around them: a document never gets a second note.
-import { App, FuzzyMatch, FuzzySuggestModal, Notice, TFile, normalizePath } from "obsidian";
+import { App, FuzzyMatch, FuzzySuggestModal, MarkdownView, Notice, TFile, WorkspaceLeaf, normalizePath } from "obsidian";
 import type { TextFoldClient } from "./client";
 import { Doc, yearOf } from "./doc";
 import { buildLink } from "./links";
@@ -24,7 +24,7 @@ export class Importer {
 	constructor(private app: App, private client: TextFoldClient, private options: () => ImportOptions) {}
 
 	/** Import these documents' notes, one at a time, and say in one notice what happened. `current` is the note the
-	 *  import starts from (the sidebar's note), else the active one. */
+	 *  import starts from (the sidebar's note), else the active one. An import of one document opens its note. */
 	async importPapers(ids: string[], current?: TFile | null): Promise<TFile[]> {
 		const opts = this.options();
 		const from = current !== undefined ? current : this.app.workspace.getActiveFile();
@@ -50,7 +50,22 @@ export class Importer {
 		if (failed.length) shown.push(`${failed.length} failed: ${failed[0].error ?? ""}`);
 		if (target.fallback && out.some(o => o.result === "new")) shown.push(`No note was open, so new notes went to ${target.folder}.`);
 		new Notice(shown.join("\n") || "Nothing imported.", 8000);
+		if (ids.length === 1 && files.length === 1) await this.show(files[0]);
 		return files;
+	}
+
+	/** The note in front: its tab if it is open already, else a new tab, so the note the import started from stays open. */
+	private async show(file: TFile): Promise<void> {
+		let leaf: WorkspaceLeaf | null = null;
+		this.app.workspace.iterateAllLeaves(l => {
+			if (!leaf && l.view instanceof MarkdownView && l.view.file?.path === file.path) leaf = l;
+		});
+		if (!leaf) {
+			leaf = this.app.workspace.getLeaf("tab");
+			await leaf.openFile(file);
+		}
+		await this.app.workspace.revealLeaf(leaf);
+		this.app.workspace.setActiveLeaf(leaf, { focus: true });
 	}
 
 	private async importOne(id: string, paper: Paper | undefined, folder: string): Promise<Outcome> {

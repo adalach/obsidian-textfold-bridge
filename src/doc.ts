@@ -94,14 +94,19 @@ export function sectionSummary(s: DocSection, level: Level): string {
 }
 
 /** A section as TextFold's reader drags it by its heading: its name ("2.1 Method"), and its text at a level in blocks
- *  separated by blank lines. At Key, Takeaway and Topic the section's own block is its summary line and a "- " line
- *  per paragraph, and each subsection's block its name, its summary and its paragraphs the same way; at Full and Brief
- *  every paragraph is a block of its own, each subsection's name a block before its paragraphs. `units` are all the
- *  paragraphs, subsections' included, in reading order. */
+ *  separated by blank lines. At Key and Takeaway the section's own block is its summary line and a "- " line per
+ *  paragraph, and each subsection's block its name, its summary and its paragraphs the same way; at Full and Brief
+ *  every paragraph is a block of its own, each subsection's name a block before its paragraphs. At Topic, its card on
+ *  the map (a subsection has a card of its own): its summary, then its paragraphs' topics (its chips) on one line,
+ *  joined by " · ". `units` are all the paragraphs it gives, in reading order. */
 export function sectionText(index: DocIndex, id: string, level: Level): { heading: string; text: string; units: string[] } | null {
 	const all = index.withSubsections(id);
 	if (!all.length) return null;
 	const oneLine = (t: string) => t.replace(/\s+/g, " ").trim();
+	if (level === "topic") {
+		const s = all[0], chips = s.units.map(u => oneLine(unitText(u, level))).filter(Boolean);
+		return { heading: sectionName(s), text: [s.takeaway.trim(), chips.join(" · ")].filter(Boolean).join("\n"), units: s.units.map(u => u.id) };
+	}
 	const blocks: string[] = [];
 	all.forEach((x, i) => {
 		const name = i > 0 ? sectionName(x) : "";

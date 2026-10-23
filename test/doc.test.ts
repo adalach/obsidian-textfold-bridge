@@ -42,6 +42,9 @@ describe("ranges and sections of a document", () => {
 	it("writes a section at Full and Brief as a block per paragraph, each subsection's name before its own", () => {
 		expect(sectionText(index, "S2", "full")!.text).toBe("2.1 Setup\n\nWe use Thingi10K. It is large.\n\nA laptop runs it. Nothing else.\n\n2.2 Results\n\nQueries run faster. By far.");
 		expect(sectionText(index, "S3", "brief")!.text).toBe("Thin parts are hard.");
+		// at Topic, its card on the map: its summary, then its paragraphs' topics on one line; a subsection is a card of its own
+		expect(sectionText(index, "S2.1", "topic")).toEqual({ heading: "2.1 Setup", text: "Meshes and machines\nThingi10K meshes · A laptop", units: ["S2.1.p1", "S2.1.p2"] });
+		expect(sectionText(index, "S2", "topic")).toEqual({ heading: "2 Experiments", text: "", units: [] });
 		expect(sectionText(index, "nope", "full")).toBeNull();
 	});
 });

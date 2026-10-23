@@ -167,8 +167,8 @@ describe("itemFromLink", () => {
 	});
 
 	it("fills a section link with its heading, summary and paragraphs, as TextFold drags a section", () => {
-		expect(itemFromLink({ paper: "2602.07369", s: "S3", level: "topic" }, doc, null)).toMatchObject({
-			kind: "section", heading: "3 Method", text: "greedy fitting\n- Greedy fitting\n- No levels yet.", units: ["S3.p2", "S3.p3"], written: true,
+		expect(itemFromLink({ paper: "2602.07369", s: "S3", level: "topic" }, doc, null)).toMatchObject({   // (its card on the map)
+			kind: "section", heading: "3 Method", text: "Greedy fitting of convex primitives\nGreedy fitting · No levels yet.", units: ["S3.p2", "S3.p3"], written: true,
 		});
 		expect(itemFromLink({ paper: "2602.07369", s: "S3", level: "full" }, doc, null)).toMatchObject({
 			text: "Primitives are fitted greedily. Each is convex.\n\nNo levels yet.", written: false,

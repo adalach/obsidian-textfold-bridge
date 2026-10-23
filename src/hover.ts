@@ -8,7 +8,7 @@ import type { TextFoldClient } from "./client";
 import { DocIndex, sectionName, sectionText, unitText } from "./doc";
 import { Level, TextFoldLink, parseLink } from "./links";
 import { keepOutOfLists } from "./drag";
-import { NotesFile, Paper, citationLinks, noteLine } from "./notes";
+import { Note, NotesFile, Paper, citationLinks, noteLine, notePassage, passageLabel } from "./notes";
 import { missingPaper } from "./opener";
 
 const WAIT_MS = 300;
@@ -124,14 +124,14 @@ export class LinkPreviews {
 				return;
 			}
 			if (note.lost) lostLine(body);
-			if (note.quote) body.createDiv({ cls: "tfb-card-quote", text: note.quote });
+			passageBox(body, note);
 			if (note.text) body.createDiv({ cls: "tfb-card-text", text: note.text });
 			const turn = note.kind === "ask" ? note.thread[0] : undefined;
 			if (turn) {
 				body.createDiv({ cls: "tfb-card-q", text: turn.q });
 				if (turn.takeaway) body.createDiv({ cls: "tfb-hover-text", text: `→ ${turn.takeaway}` });
 			}
-			if (!note.quote && !note.text && !turn) body.createDiv({ cls: "tfb-hover-text", text: noteLine(note) });
+			if (!notePassage(note) && !note.text && !turn) body.createDiv({ cls: "tfb-hover-text", text: noteLine(note) });
 			return;
 		}
 
@@ -201,6 +201,15 @@ export function lostLine(el: HTMLElement): void {
 	const line = el.createDiv("tfb-lost-line");
 	setIcon(line.createSpan("tfb-lost-icon"), "alert-triangle");
 	line.createSpan({ text: "Passage not found after the edit" });
+}
+
+/** A note's passage in a card: the author's words, or the words of the written line it was made on, marked as the
+ *  model's and saying so ("at Key, in the model’s words"). */
+export function passageBox(el: HTMLElement, note: Note): void {
+	const passage = notePassage(note);
+	if (!passage) return;
+	el.createDiv({ cls: `tfb-card-quote${note.shown ? " is-written" : ""}`, text: passage });
+	if (note.shown) el.createDiv({ cls: "tfb-card-at", text: passageLabel(note) });
 }
 
 /** At most a dozen blocks of a long section or range, and how many more there are. */

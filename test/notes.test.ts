@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { citationLinks, noteLine, noteLink, parseNotes, parsePapers } from "../src/notes";
+import { citationLinks, isModelPassage, noteLine, noteLink, notePassage, parseNotes, parsePapers, passageLabel } from "../src/notes";
 
 // the shape of TextFold's notes.json (docs/notes-format.md), with made-up text
 const file = {
@@ -48,6 +48,38 @@ describe("noteLine and noteLink", () => {
 	it("opens the reader at the note, its paragraph, level and language", () => {
 		expect(noteLink("p", hl)).toEqual({ paper: "p", n: "n-hl1", u: "u12", level: "full", lang: "en" });
 		expect(noteLink("p", ask)).toEqual({ paper: "p", n: "n-ask1", level: "key", lang: "en" });
+	});
+});
+
+describe("a note made on a written line", () => {
+	const [key, take, bad] = parseNotes({
+		notes: [
+			{ id: "n-key", kind: "highlight", anchor: { unit: "u12", level: 2, tokens: [1, 5], quote: { exact: "zones are convex" }, shown: { words: [0, 3], exact: "Zones  are\nconvex, fast" } }, text: "", thread: [] },
+			{ id: "n-take", kind: "note", anchor: { unit: "u12", level: 1, tokens: null, quote: { exact: "fast" }, shown: { words: [3, 3], exact: "fast" } }, text: "Why?", thread: [] },
+			{ id: "n-bad", kind: "highlight", anchor: { unit: "u12", level: 2, quote: { exact: "zones" }, shown: { words: "0-3", exact: "Zones" } }, text: "", thread: [] },
+		],
+	}, "p").notes;
+
+	it("keeps the line's words as the model wrote them, and the author's in the quote", () => {
+		expect(key).toMatchObject({ quote: "zones are convex", shown: { words: [0, 3], exact: "Zones  are\nconvex, fast" }, level: "key" });
+		expect(bad.shown).toBeUndefined();
+	});
+
+	it("shows the line's words, and says whose they are and at which level", () => {
+		expect(notePassage(key)).toBe("Zones  are\nconvex, fast");
+		expect(noteLine(key)).toBe("Zones are convex, fast");
+		expect(noteLine(take)).toBe("Why?");
+		expect(passageLabel(key)).toBe("at Key, in the model’s words");
+		expect(passageLabel(take)).toBe("at Takeaway, in the model’s words");
+		expect(notePassage(bad)).toBe("zones");
+		expect(passageLabel(bad)).toBe("");
+	});
+
+	it("tells a line in the model's words from the reader's", () => {
+		expect(isModelPassage(key, noteLine(key))).toBe(true);
+		expect(isModelPassage(take, noteLine(take))).toBe(false);
+		expect(isModelPassage(bad, "zones")).toBe(false);
+		expect(isModelPassage(undefined, "zones")).toBe(false);
 	});
 });
 

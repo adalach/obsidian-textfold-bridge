@@ -148,6 +148,11 @@
 	text-overflow: ellipsis;
 }
 
+/* a line that is a note's passage in the model's words (a note made at Key or Takeaway), in their colour */
+.tfb-text.is-written {
+	color: color-mix(in srgb, var(--color-purple) 70%, var(--text-normal));
+}
+
 .tfb-doc .tfb-text {
 	font-weight: var(--font-semibold);
 }
@@ -257,6 +262,23 @@
 	border-left: 2px solid var(--color-yellow);
 	color: var(--text-muted);
 	white-space: pre-wrap;
+}
+
+/* a passage in the model's words: the line at its left in their colour (the fold view's --tfb-ai), and under it where
+   and whose they are, "at Key, in the model’s words" */
+.tfb-card-quote.is-written {
+	border-left-color: var(--tfb-ai, var(--color-purple));
+}
+
+.tfb-card-at,
+.tfb-quote-at {
+	color: var(--text-faint);
+	font-size: var(--font-ui-smaller);
+	font-style: italic;
+}
+
+.tfb-card-at {
+	margin: -2px 0 4px 10px;
 }
 
 .tfb-card-text {
@@ -808,6 +830,11 @@
 
 .tfb-quote {
 	color: var(--text-muted);
+}
+
+.tfb-quote.is-written,
+.tfb-mn.tfb-short .tfb-written {
+	color: color-mix(in srgb, var(--tfb-ai) 70%, var(--text-muted));
 }
 
 .tfb-ntext {

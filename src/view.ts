@@ -11,13 +11,13 @@ import { TextFoldError } from "./client";
 import { Doc, DocIndex, sectionName } from "./doc";
 import { itemFromLink, setTransfer, shortTitle } from "./drag";
 import { FoldRecord, FoldState } from "./fold";
-import { lostLine } from "./hover";
+import { lostLine, passageBox } from "./hover";
 import { ICON } from "./icon";
 import { jumpTo } from "./jump";
 import { TextFoldLink, findPaperIds, markdownLink } from "./links";
 import { missingPaper } from "./opener";
 import type TextFoldBridgePlugin from "./main";
-import { Note, NotesFile, citationLinks, noteLine, noteLink } from "./notes";
+import { Note, NotesFile, citationLinks, isModelPassage, noteLine, noteLink } from "./notes";
 import { WHOLE, groupNotes } from "./notesMarkdown";
 import { describeConnection } from "./settings";
 
@@ -290,7 +290,7 @@ export class TextFoldNotesView extends ItemView {
 		setIcon(row.createDiv("tfb-kind"), icon);
 		// a range of paragraphs: its first, and how many follow in a label of their own, out of reach of the ellipsis
 		const more = / … \(\+(\d+)\)$/.exec(text);
-		row.createDiv({ cls: "tfb-text", text: (more ? text.slice(0, more.index) : text).replace(/\s+/g, " ") });
+		row.createDiv({ cls: `tfb-text${isModelPassage(note, text) ? " is-written" : ""}`, text: (more ? text.slice(0, more.index) : text).replace(/\s+/g, " ") });
 		if (more) row.createDiv({ cls: "tfb-more", text: `+${more[1]}`, attr: { "aria-label": `And ${more[1]} more paragraph${more[1] === "1" ? "" : "s"}` } });
 		if (meta) row.createDiv({ cls: "tfb-meta", text: meta });
 		const missing = this.reachable && !!it && !it.file;
@@ -349,7 +349,7 @@ export class TextFoldNotesView extends ItemView {
 		const line = noteLine(note) || KIND_NAME[note.kind];
 		const row = list.createDiv({ cls: `tfb-row tfb-item tfb-is-${note.kind}` });
 		setIcon(row.createDiv("tfb-kind"), KIND_ICON[note.kind]);
-		row.createDiv({ cls: "tfb-text", text: line });
+		row.createDiv({ cls: `tfb-text${isModelPassage(note, line) ? " is-written" : ""}`, text: line });
 		if (note.lost) {
 			row.addClass("tfb-lost");
 			const mark = row.createDiv({ cls: "tfb-lost-icon", attr: { "aria-label": "Passage not found after the edit" } });
@@ -530,7 +530,7 @@ class HoverCard extends Component {
 		if (note.updated) meta.push(note.updated.slice(0, 10));
 		card.createDiv({ cls: "tfb-card-meta", text: meta.join(" · ") });
 		if (note.lost) lostLine(card);
-		if (note.quote) card.createDiv({ cls: "tfb-card-quote", text: note.quote });
+		passageBox(card, note);
 		if (note.text) card.createDiv({ cls: "tfb-card-text", text: note.text });
 		for (const turn of note.thread) {
 			if (turn.q) card.createDiv({ cls: "tfb-card-q", text: turn.q });

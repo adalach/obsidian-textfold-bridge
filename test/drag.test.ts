@@ -116,6 +116,15 @@ describe("formatItem", () => {
 		].join("\n"));
 	});
 
+	it("marks a highlight made on a written line as the model's words, as TextFold 0.10.28 sends it", () => {
+		const hl = parseDragJson(JSON.stringify({ ...wire, kind: "note", level: "key", text: "fitted one by one", quote: "fitted one by one", comment: "", written: true, link: "textfold://open?paper=2602.07369&n=n-3&level=key" }))!;
+		expect(formatItem(hl, "callout")).toBe([
+			"> [!textfold|written] Convex Primitive Decomposition › 3 Method",
+			"> fitted one by one [↗](textfold://open?paper=2602.07369&n=n-3&level=key)",
+		].join("\n"));
+		expect(formatItem(hl, "quote")).toBe("> fitted one by one *(written by the model)* [↗](textfold://open?paper=2602.07369&n=n-3&level=key)");
+	});
+
 	it("shows an Ask as passage, question and the model's answer", () => {
 		const ask = parseDragJson(JSON.stringify({ ...wire, kind: "ask", text: "Yes, always [[S3.p2]].", quote: "Each is convex.", comment: "Always?", written: true, link: "textfold://open?paper=2602.07369&n=n-2" }))!;
 		expect(formatItem(ask, "callout").split("\n").slice(0, 6)).toEqual([
@@ -183,6 +192,15 @@ describe("itemFromLink", () => {
 	it("fills a note link with the passage and comment, an Ask with its question and answer", () => {
 		expect(itemFromLink({ paper: "2602.07369", n: "n-1" }, doc, nf)).toMatchObject({ kind: "note", text: "Why greedy?", quote: "fitted greedily", comment: "Why greedy?", written: false });
 		expect(itemFromLink({ paper: "2602.07369", n: "n-2" }, doc, nf)).toMatchObject({ kind: "ask", text: "Yes.", quote: "Each is convex.", comment: "Always?", written: true });
+	});
+
+	it("fills a note made on a written line with the line's words, the model's unless the reader wrote a comment", () => {
+		const key = parseNotes({ paper: { id: "2602.07369", title: "t" }, notes: [
+			{ id: "n-key", kind: "highlight", anchor: { unit: "S3.p2", section: "S3", level: 2, tokens: [0, 3], quote: { exact: "Primitives are fitted greedily." }, shown: { words: [0, 3], exact: "fitted one by one" } }, text: "", thread: [] },
+			{ id: "n-key2", kind: "highlight", anchor: { unit: "S3.p2", section: "S3", level: 2, tokens: [0, 3], quote: { exact: "Primitives are fitted greedily." }, shown: { words: [0, 3], exact: "fitted one by one" } }, text: "Why?", thread: [] },
+		] }, "2602.07369");
+		expect(itemFromLink({ paper: "2602.07369", n: "n-key" }, doc, key)).toMatchObject({ kind: "note", text: "fitted one by one", quote: "fitted one by one", written: true });
+		expect(itemFromLink({ paper: "2602.07369", n: "n-key2" }, doc, key)).toMatchObject({ kind: "note", text: "Why?", quote: "fitted one by one", comment: "Why?", written: false });
 	});
 
 	it("names the document when TextFold gave nothing", () => {

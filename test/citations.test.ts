@@ -91,7 +91,13 @@ describe("by paper, with what TextFold says", () => {
 	});
 	const nf = parseNotes({ paper: { id: "2602.07369", title: "t" }, notes: [
 		{ id: "n-1", kind: "ask", anchor: { unit: "S1.p1.1", section: "S1", quote: { exact: "Intro." } }, text: "", thread: [{ q: "Why convex?", a: "Speed.", takeaway: "Speed." }, { q: "And why greedy?", a: "Simplicity.", takeaway: "Simple." }] },
+		{ id: "n-key", kind: "highlight", anchor: { unit: "S3.p1.1", section: "S3", level: 2, tokens: [0, 3], quote: { exact: "Primitives are fitted greedily." }, shown: { words: [0, 1], exact: "Greedy, convex." } }, text: "", thread: [] },
 	] }, "2602.07369");
+
+	it("cites a note made on a written line by the line's words", () => {
+		const [c] = findCitations("[a mark](textfold://open?paper=2602.07369&n=n-key)");
+		expect(citedText(c, doc, nf)).toBe("Greedy, convex.");
+	});
 
 	it("tells what each citation cites", () => {
 		expect(citedText(cites[1], doc, nf)).toBe("Greedy fitting");

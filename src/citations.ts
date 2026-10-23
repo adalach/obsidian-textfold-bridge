@@ -3,7 +3,7 @@
 // section. Pure functions without runtime imports from obsidian; test/citations.test.ts covers them.
 import { Doc, DocIndex, sectionName, sectionSummary, unitText } from "./doc";
 import { TextFoldLink, parseLink } from "./links";
-import { NotesFile } from "./notes";
+import { NotesFile, notePassage } from "./notes";
 
 export interface Citation {
 	link: TextFoldLink;
@@ -115,17 +115,18 @@ function plain(s: string): string {
 		.trim();
 }
 
-/** What a citation cites, from TextFold: a note's quote (an Ask's question: the linked turn's, else the first), a
- *  paragraph at the link's level (else Takeaway), a range of them as its first and how many follow ("… (+2)"), a
- *  section by its heading (its summary when it has no title); null when TextFold gave nothing for it. */
+/** What a citation cites, from TextFold: a note's passage (on a written line, its words as the model wrote them; an
+ *  Ask's question: the linked turn's, else the first), a paragraph at the link's level (else Takeaway), a range of them
+ *  as its first and how many follow ("… (+2)"), a section by its heading (its summary when it has no title); null when
+ *  TextFold gave nothing for it. */
 export function citedText(c: Citation, doc: Doc | null, nf: NotesFile | null): string | null {
 	const index = doc ? new DocIndex(doc) : null;
 	const level = c.link.level ?? "takeaway";
 	if (c.link.n) {
 		const note = nf?.notes.find(x => x.id === c.link.n);
 		if (!note) return null;
-		if (note.kind === "ask") return (c.link.t !== undefined ? note.thread[c.link.t]?.q : undefined) || note.thread[0]?.q || note.quote || null;
-		return note.quote || note.text || null;
+		if (note.kind === "ask") return (c.link.t !== undefined ? note.thread[c.link.t]?.q : undefined) || note.thread[0]?.q || notePassage(note) || null;
+		return notePassage(note) || note.text || null;
 	}
 	if (c.link.u) {
 		const units = index?.range(c.link.u, c.link.to) ?? [];

@@ -24,7 +24,8 @@ export interface Turn {
 export interface Note {
 	id: string;
 	kind: NoteKind;
-	quote: string; // the passage, anchor.quote.exact
+	quote: string; // the passage in the author's words, anchor.quote.exact
+	shown?: { words: [number, number]; exact: string }; // made on a written line (Key, Takeaway): its words selected, as the model wrote them
 	text: string; // the reader's own note
 	thread: Turn[];
 	unit?: string;
@@ -44,6 +45,7 @@ export interface NotesFile {
 
 const str = (v: unknown): string => (typeof v === "string" ? v : "");
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+const pair = (v: unknown): [number, number] | undefined => (Array.isArray(v) && typeof v[0] === "number" && typeof v[1] === "number" ? [v[0], v[1]] : undefined);
 
 export function parsePapers(data: unknown): Paper[] {
 	if (!Array.isArray(data)) return [];
@@ -78,6 +80,8 @@ function parseNote(data: unknown): Note | null {
 	const kind = str(o.kind);
 	if (!str(o.id) || (kind !== "highlight" && kind !== "note" && kind !== "ask")) return null;
 	const anchor = obj(o.anchor);
+	const shown = obj(anchor.shown);
+	const words = pair(shown.words);
 	const thread = (Array.isArray(o.thread) ? o.thread : []).map((t): Turn => {
 		const r = obj(t);
 		return { q: str(r.q), a: str(r.a), takeaway: str(r.takeaway), pending: r.pending === true, error: str(r.error) };
@@ -86,12 +90,13 @@ function parseNote(data: unknown): Note | null {
 		id: str(o.id),
 		kind,
 		quote: str(obj(anchor.quote).exact),
+		shown: words && str(shown.exact) ? { words, exact: str(shown.exact) } : undefined,
 		text: str(o.text),
 		thread,
 		unit: str(anchor.unit) || undefined,
 		section: str(anchor.section) || undefined,
 		on: str(anchor.on) || undefined,
-		tokens: Array.isArray(anchor.tokens) && typeof anchor.tokens[0] === "number" && typeof anchor.tokens[1] === "number" ? [anchor.tokens[0], anchor.tokens[1]] : undefined,
+		tokens: pair(anchor.tokens),
 		lost: anchor.lost && typeof anchor.lost === "object" ? { since: str(obj(anchor.lost).since) } : undefined,
 		level: levelName(anchor.level),
 		lang: str(anchor.lang) || undefined,
@@ -99,10 +104,32 @@ function parseNote(data: unknown): Note | null {
 	};
 }
 
+const flat = (s: string) => s.replace(/\s+/g, " ").trim();
+
 /** The one line a note shows as: an Ask conversation's first question, a note's text, else the passage. */
 export function noteLine(note: Note): string {
-	const line = note.kind === "ask" ? note.thread[0]?.q || note.quote : note.kind === "note" ? note.text || note.quote : note.quote || note.text;
-	return line.replace(/\s+/g, " ").trim();
+	const passage = notePassage(note);
+	const line = note.kind === "ask" ? note.thread[0]?.q || passage : note.kind === "note" ? note.text || passage : passage || note.text;
+	return flat(line);
+}
+
+/** The passage a note marks, as the reader selected it (TextFold's reader shows it so): the words of the written line
+ *  it was made on, the model's, else its quote, the author's. */
+export function notePassage(note: Note): string {
+	return note.shown?.exact || note.quote;
+}
+
+/** For a note made on a written line, where its passage is and whose words they are, as TextFold's export says it:
+ *  "at Key, in the model’s words"; "" for any other note. */
+export function passageLabel(note: Note): string {
+	if (!note.shown) return "";
+	const at = note.level ? `at ${note.level[0].toUpperCase()}${note.level.slice(1)}, ` : "";
+	return `${at}in the model’s words`;
+}
+
+/** Whether a line shown for a note (its noteLine, a citation's text) is its passage in the model's words. */
+export function isModelPassage(note: Note | undefined, line: string): boolean {
+	return !!note?.shown && flat(line) === flat(note.shown.exact);
 }
 
 /** The link that opens the reader at this note, at the level and in the language it was made in. */

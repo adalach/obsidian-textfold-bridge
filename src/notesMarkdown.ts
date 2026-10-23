@@ -1,11 +1,12 @@
 // TextFold's notes on a document as Markdown in the vault ("Import notes"), in the style of TextFold's own export for
 // Obsidian (notesMarkdown in its reader.js), without its block ids and credit line: grouped by section in reading order,
 // each highlight a quote, then the reader's comment and a link back to the note in TextFold; a conversation as a
-// [!question] callout. The notes go between two marker comments, so a re-import replaces only them and keeps what was
+// [!question] callout. A note made on a written line (Key, Takeaway) quotes the line's words as the model wrote them,
+// and says so. The notes go between two marker comments, so a re-import replaces only them and keeps what was
 // written around them. Pure functions without runtime imports from obsidian; test/notesMarkdown.test.ts covers them.
 import { Doc, DocIndex, sectionName } from "./doc";
 import { buildLink } from "./links";
-import { Note, NotesFile, noteLink } from "./notes";
+import { Note, NotesFile, noteLink, notePassage, passageLabel } from "./notes";
 
 export const BLOCK_START = "%% TextFold notes: a re-import replaces everything from here to the end marker %%";
 export const BLOCK_END = "%% End of TextFold notes %%";
@@ -82,18 +83,24 @@ function noteMarkdown(n: Note, paper: string, index: DocIndex | null): string[] 
 	const icon = `[↗](${buildLink(noteLink(paper, n))})`; // drawn as TextFold's icon: a link back to the note
 	const quoteLines: string[] = [];
 	const said = n.kind === "ask" ? n.thread.filter(t => t.a) : [];
+	const passage = notePassage(n); // on a written line, its words as the model wrote them: never as the author's
+	const at = passageLabel(n);
 	if (said.length) { // the conversation as one callout: the first question its title, each later one in bold
 		quoteLines.push(...quote(`[!question] ${said[0].q}`));
-		if (n.quote) quoteLines.push(...quote(`*${n.quote}*`));
+		if (passage) quoteLines.push(...quote(`*${passage}*${at ? ` (${at})` : ""}`));
 		said.forEach((t, k) => {
 			quoteLines.push(">");
 			if (k) quoteLines.push(...quote(`**${t.q}**`), ">");
 			quoteLines.push(...quote(answerMarkdown(t.a, paper, index)));
 			if (t.takeaway) quoteLines.push(">", ...quote(`→ ${t.takeaway}`));
 		});
-	} else if (n.on !== "paper" && n.quote) quoteLines.push(...quote(n.quote)); // (a note on the whole paper quotes nothing)
+	} else if (n.on !== "paper" && passage) { // (a note on the whole paper quotes nothing)
+		quoteLines.push(...quote(passage));
+		if (at) quoteLines.push(">", ...quote(`*${at}*`));
+	}
 	const comment = n.text.trim();
-	// the link back ends the note's last line: its comment, else its passage or conversation
+	// the link back ends the note's last line: its comment, else its passage (or the line saying whose words they are)
+	// or conversation
 	if (!comment && quoteLines.length) quoteLines[quoteLines.length - 1] += ` ${icon}`;
 	const out = [...quoteLines, ""];
 	if (n.lost) out.push("*Passage not found after the edit.*", "");

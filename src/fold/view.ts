@@ -6,11 +6,12 @@
 import { Component, FileView, HoverParent, HoverPopover, Keymap, MarkdownRenderer, Modal, Scope, Setting, TFile, ViewStateResult, WorkspaceLeaf, debounce, setTooltip } from "obsidian";
 import type { Job } from "../client";
 import { Doc, DocSection, DocUnit } from "../doc";
+import { passageBox } from "../hover";
 import { ICON } from "../icon";
 import { FALLBACK_LANGS } from "../langs";
 import type { Level } from "../links";
 import type TextFoldBridgePlugin from "../main";
-import { Note, NotesFile, citationLinks, noteLink } from "../notes";
+import { Note, NotesFile, citationLinks, isModelPassage, noteLink, notePassage, passageLabel } from "../notes";
 import { FOLD_LEVELS, LEVEL_LABEL, Piece, PreparedUnit, alignRendered, piecesOf, piecesText, prepSection, prepUnit, tokenize } from "./align";
 import { FoldMap, NoteBlock, mapUnits, mappedShare, splitBlocks } from "./blocks";
 import { Motion } from "./motion";
@@ -685,9 +686,10 @@ export class FoldView extends FileView {
 		box.dataset.id = `note:${x.id}:${form}`;
 		box.dataset.note = x.id;
 		if (form === "s") {
-			const line = x.kind === "ask" ? x.thread[0]?.q ?? "" : (x.text || x.quote).split("\n")[0];
+			const line = x.kind === "ask" ? x.thread[0]?.q ?? "" : (x.text || notePassage(x)).split("\n")[0];
 			box.createSpan({ cls: "tfb-dot" });
-			box.appendText(` ${line}`);
+			if (isModelPassage(x, line)) box.createSpan({ cls: "tfb-written", text: ` ${line}` });
+			else box.appendText(` ${line}`);
 			if (uid) box.dataset.mk = uid;
 			return;
 		}
@@ -703,7 +705,11 @@ export class FoldView extends FileView {
 				body.createDiv({ cls: "tfb-a", text: turn.takeaway || (turn.pending ? "Answering…" : "") });
 			}
 		} else {
-			if (!x.text && x.quote) body.createDiv({ cls: "tfb-quote", text: `“${x.quote}”` });
+			const passage = notePassage(x);
+			if (!x.text && passage) {
+				body.createDiv({ cls: `tfb-quote${x.shown ? " is-written" : ""}`, text: `“${passage}”` });
+				if (x.shown) body.createDiv({ cls: "tfb-quote-at", text: passageLabel(x) });
+			}
 			if (x.text) body.createDiv({ cls: "tfb-ntext", text: x.text });
 		}
 	}
@@ -878,7 +884,7 @@ export class FoldView extends FileView {
 		if (mk) {
 			for (const x of this.notesBy.get(mk.dataset.mk ?? "") ?? []) {
 				body.createDiv({ cls: "tfb-hover-meta", text: x.kind === "ask" ? "Ask" : x.text ? "Note" : "Highlight" });
-				if (x.quote) body.createDiv({ cls: "tfb-card-quote", text: x.quote });
+				passageBox(body, x);
 				if (x.text) body.createDiv({ cls: "tfb-card-text", text: x.text });
 				const turn = x.kind === "ask" ? x.thread.find(tt => tt.a) : undefined;
 				if (turn) {

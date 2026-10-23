@@ -12,7 +12,7 @@
 // A plain textfold:// link (text/uri-list or text/plain) is made into an item from the document's JSON instead.
 import { Doc, DocIndex, isWritten, sectionName, sectionText, unitText } from "./doc";
 import { Level, LEVELS, TextFoldLink, buildLink, isPaperId, parseLink } from "./links";
-import { NotesFile, noteLine } from "./notes";
+import { NotesFile, noteLine, notePassage } from "./notes";
 import { answerMarkdown } from "./notesMarkdown";
 
 export const DRAG_MIME = "application/x-textfold+json";
@@ -139,9 +139,10 @@ export function itemFromLink(link: TextFoldLink, doc: Doc | null, nf: NotesFile 
 	if (note) {
 		item.kind = note.kind === "ask" ? "ask" : "note";
 		item.section = section(index?.sectionOf(note.unit, note.section));
-		// as TextFold's reader sends them: a note's text is the reader's words (else the passage), an Ask's is the last
-		// answer in one sentence, its comment the reader's question
-		if (note.quote) item.quote = note.quote;
+		// as TextFold's reader sends them: a note's text is the reader's words (else the passage, the model's words when
+		// on a written line or a summary), an Ask's is the last answer in one sentence, its comment the reader's question
+		const passage = notePassage(note);
+		if (passage) item.quote = passage;
 		if (note.kind === "ask") {
 			// a link to one turn: that turn's answer, its question as the comment (as TextFold sends a message)
 			const turn = link.t !== undefined ? note.thread[link.t] : undefined;
@@ -151,8 +152,10 @@ export function itemFromLink(link: TextFoldLink, doc: Doc | null, nf: NotesFile 
 			const q = turn ? turn.q : note.thread[0]?.q;
 			if (q && item.text !== q) item.comment = q;
 		} else {
-			item.text = note.text.trim() || note.quote || noteLine(note);
-			if (note.text.trim()) item.comment = note.text.trim();
+			const comment = note.text.trim();
+			item.text = comment || passage || noteLine(note);
+			if (comment) item.comment = comment;
+			item.written = !comment && (!!note.shown || note.on === "summary");
 		}
 	} else if (link.u && index?.unit(link.u)) {
 		// a paragraph, or a range of them (u=…&to=…): a block per paragraph
@@ -265,7 +268,7 @@ function itemParts(item: DragItem): { md: string; written: boolean }[] {
 		if (md) parts.push({ md, written });
 	};
 	if (item.kind === "note") {
-		add(own(item.quote));
+		add(own(item.quote), item.written && !item.comment); // (the model's words: a note on a written line or a summary)
 		add(own(item.comment ?? (item.quote ? "" : item.text)), item.written && !item.comment);
 		if (!parts.length) add(own(item.text), item.written);
 	} else if (item.kind === "ask") {

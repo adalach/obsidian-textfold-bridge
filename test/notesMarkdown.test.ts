@@ -128,6 +128,36 @@ describe("notesBlock", () => {
 	});
 });
 
+describe("notesBlock, notes made on a written line", () => {
+	// made at Key and Takeaway in TextFold 0.10.28 and later: anchor.shown holds the line's words, the model's
+	const written = parseNotes({
+		paper: { id: "md-zoning-1234abcd", title: "Zoning: a short note" },
+		notes: [
+			{ id: "n-key", kind: "highlight", anchor: { unit: "p-aaaa1111", section: "S0", level: 2, tokens: [0, 2], quote: { exact: "Zones are convex." }, shown: { words: [0, 4], exact: "Zones are convex, which is fast." } }, text: "", thread: [] },
+			{ id: "n-take", kind: "highlight", anchor: { unit: "p-aaaa1111", section: "S0", level: 1, tokens: [0, 2], quote: { exact: "Zones are convex." }, shown: { words: [0, 2], exact: "Zones are convex" } }, text: "Nice.", thread: [] },
+			{ id: "n-q", kind: "ask", anchor: { unit: "p-aaaa1111", section: "S0", level: 2, tokens: null, quote: { exact: "which is fast" }, shown: { words: [3, 5], exact: "which is fast" } }, text: "", thread: [{ q: "How fast?", a: "Linear.", takeaway: "Linear." }] },
+		],
+	}, "md-zoning-1234abcd");
+	const lines = notesBlock(written, doc).split("\n");
+	const link = (n: string) => `[↗](textfold://open?paper=md-zoning-1234abcd&u=p-aaaa1111&n=${n}&level=`;
+
+	it("quotes the line's words and says they are the model's, at which level, the link back last", () => {
+		const at = lines.indexOf("> Zones are convex, which is fast.");
+		expect(lines.slice(at, at + 4)).toEqual(["> Zones are convex, which is fast.", ">", `> *at Key, in the model’s words* ${link("n-key")}key)`, ""]);
+		expect(lines).not.toContain("> Zones are convex.");
+	});
+
+	it("puts the reader's comment after the label", () => {
+		const at = lines.indexOf("> Zones are convex");
+		expect(lines.slice(at, at + 5)).toEqual(["> Zones are convex", ">", "> *at Takeaway, in the model’s words*", "", `Nice. ${link("n-take")}takeaway)`]);
+	});
+
+	it("says so after the passage of a conversation", () => {
+		const at = lines.indexOf("> [!question] How fast?");
+		expect(lines[at + 1]).toBe("> *which is fast* (at Key, in the model’s words)");
+	});
+});
+
 describe("answerMarkdown", () => {
 	it("labels citations by unit id without the document", () => {
 		expect(answerMarkdown("A [[u6]].", "p", null)).toBe("A ([u6](textfold://open?paper=p&u=u6)).");

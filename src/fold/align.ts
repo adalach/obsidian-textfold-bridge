@@ -15,10 +15,17 @@ export interface Token {
 	s?: 1; // a space follows it
 	c0: number; // where it is in its text
 	c1: number;
+	k?: Atom; // a formula or a citation, one piece drawn as Obsidian draws it
 }
 
-// a number with its decimals, a word with its inner apostrophes and hyphens, any other mark; spaces between
-const TOKRE = /\s+|\d+(?:[.,]\d+)+%?|[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*|\S/gu;
+/** A piece that is not a word: a formula ($…$, $$…$$) or a Pandoc citation in brackets ([@key; @other, p. 3]). */
+export type Atom = "math" | "cite";
+
+// a formula, a citation in brackets, a number with its decimals, a word with its inner apostrophes and hyphens, any
+// other mark; spaces between. A formula's $ is followed and preceded by a non-space and not followed by a digit (as
+// Pandoc and Obsidian read it, so "$5 and $10" stays money); a citation's @ starts a key, not inside a word (an address)
+const TOKRE = /\$\$[\s\S]+?\$\$|\$(?=\S)(?:\\.|[^$\\\n])+?(?<=\S)\$(?!\d)|\[[^[\]\n]*?(?<![\p{L}\p{N}_])@[\p{L}\p{N}_][^[\]\n]*\]|\s+|\d+(?:[.,]\d+)+%?|[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*|\S/gu;
+const atomOf = (w: string): Atom | undefined => (w.length > 1 && w.startsWith("$") && w.endsWith("$") ? "math" : w.startsWith("[") && w.endsWith("]") && w.includes("@") ? "cite" : undefined);
 const STOP = new Set(
 	("the a an of to in is are was were be been and or that this these those it its for on with as by at from we our their they " +
 		"which while than then into can not but such also has have had does do more most less only both").split(" "),
@@ -31,8 +38,8 @@ export function tokenize(text: string, base = 0): Token[] {
 			if (out.length) out[out.length - 1].s = 1;
 			continue;
 		}
-		const at = base + (m.index ?? 0);
-		out.push({ t: m[0], c0: at, c1: at + m[0].length });
+		const at = base + (m.index ?? 0), k = atomOf(m[0]);
+		out.push({ t: m[0], c0: at, c1: at + m[0].length, ...(k ? { k } : {}) });
 	}
 	return out;
 }
@@ -94,6 +101,7 @@ export interface Piece {
 	lead?: boolean;
 	hl?: boolean;
 	gap?: boolean;
+	k?: Atom;
 }
 
 type Aligned = Token & { id: string; m?: number; hl?: boolean };
@@ -195,7 +203,7 @@ export function piecesOf(u: PreparedUnit, level: Level, unfolded = false): Piece
 	if (level === "full" || unfolded) {
 		const ev = new Set(u.ev);
 		u.sr.forEach(([a, b], s) => {
-			for (let i = a; i < b; i++) out.push({ id: pre + i, t: u.toks[i].t, s: !!u.toks[i].s, lead: ev.has(s), hl: u.hl.has(i) });
+			for (let i = a; i < b; i++) out.push({ id: pre + i, t: u.toks[i].t, s: !!u.toks[i].s, lead: ev.has(s), hl: u.hl.has(i), k: u.toks[i].k });
 		});
 	} else if (level === "brief") {
 		// a gap (…) wherever sentences were left out: before, between and after the ones kept, as in TextFold
@@ -203,26 +211,26 @@ export function piecesOf(u: PreparedUnit, level: Level, unfolded = false): Piece
 		for (const s of u.ev) {
 			const [a, b] = u.sr[s];
 			if (a !== prevEnd) out.push({ id: `${pre}gap${s}`, t: "…", gap: true });
-			for (let i = a; i < b; i++) out.push({ id: pre + i, t: u.toks[i].t, s: !!u.toks[i].s, lead: u.km.has(i), hl: u.hl.has(i) });
+			for (let i = a; i < b; i++) out.push({ id: pre + i, t: u.toks[i].t, s: !!u.toks[i].s, lead: u.km.has(i), hl: u.hl.has(i), k: u.toks[i].k });
 			prevEnd = b;
 		}
 		if (out.length && prevEnd < u.toks.length) out.push({ id: `${pre}gapz`, t: "…", gap: true });
 	} else if (level === "key") {
 		const tn = u.tt.length;
-		u.kt.forEach((x, j) => out.push({ id: x.id, t: x.t, s: !!x.s, lead: j < tn, hl: x.hl }));
+		u.kt.forEach((x, j) => out.push({ id: x.id, t: x.t, s: !!x.s, lead: j < tn, hl: x.hl, k: x.k }));
 	} else if (level === "takeaway") {
-		u.tt.forEach(x => out.push({ id: x.id, t: x.t, s: !!x.s, lead: u.inTopic.has(x.id), hl: x.hl }));
-	} else u.tp.forEach(x => out.push({ id: x.id, t: x.t, s: !!x.s, lead: true, hl: x.hl }));
+		u.tt.forEach(x => out.push({ id: x.id, t: x.t, s: !!x.s, lead: u.inTopic.has(x.id), hl: x.hl, k: x.k }));
+	} else u.tp.forEach(x => out.push({ id: x.id, t: x.t, s: !!x.s, lead: true, hl: x.hl, k: x.k }));
 	return out;
 }
 
 /** A section's own summary words (Key and up) and topic, with ids. */
 export function prepSection(s: DocSection): { tk: Piece[]; tp: Piece[] } {
 	const pre = `${s.id}:`;
-	const tk = tokenize(s.takeaway).map((x, j) => ({ id: `${pre}s${j}`, t: x.t, s: !!x.s, lead: true }));
+	const tk = tokenize(s.takeaway).map((x, j) => ({ id: `${pre}s${j}`, t: x.t, s: !!x.s, lead: true, k: x.k }));
 	if (tk.length) tk[tk.length - 1].s = false;
 	const loc = locate(s.topic, tk);
-	const tp = loc.length ? loc.map(i => ({ ...tk[i] })) : tokenize(s.topic).map((x, j) => ({ id: `${pre}q${j}`, t: x.t, s: !!x.s, lead: true }));
+	const tp = loc.length ? loc.map(i => ({ ...tk[i] })) : tokenize(s.topic).map((x, j) => ({ id: `${pre}q${j}`, t: x.t, s: !!x.s, lead: true, k: x.k }));
 	if (tp.length) tp[tp.length - 1].s = false;
 	return { tk, tp };
 }

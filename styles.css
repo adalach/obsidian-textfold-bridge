@@ -728,6 +728,17 @@
 	white-space: nowrap;
 }
 
+/* a formula (MathJax) and a citation (as the reading view formats it) in a row of pieces */
+.tfb-tk.tfb-cite,
+.tfb-tk.tfb-atom {
+	max-width: 100%;
+	white-space: normal;
+}
+
+.tfb-tk.tfb-math mjx-container {
+	margin: 0;
+}
+
 .tfb-tk.tfb-hl,
 .tfb-hlsp {
 	background-color: var(--text-highlight-bg);

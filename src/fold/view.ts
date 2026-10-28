@@ -3,7 +3,7 @@
 // document (GET /api/doc), Key and up written by TextFold's model. A note without a document, or changed since it was
 // folded, is first sent to TextFold and folded there (as "Export this note to TextFold" does), so both share one
 // document. The look and the motion follow TextFold's reader and the design mockup (src/fold/align.ts, motion.ts).
-import { Component, FileView, HoverParent, HoverPopover, Keymap, MarkdownRenderer, Modal, Scope, Setting, TFile, ViewStateResult, WorkspaceLeaf, debounce, setTooltip } from "obsidian";
+import { Component, FileView, HoverParent, HoverPopover, Keymap, MarkdownRenderer, Modal, Scope, Setting, TFile, ViewStateResult, WorkspaceLeaf, debounce, finishRenderMath, renderMath, setTooltip } from "obsidian";
 import type { Job } from "../client";
 import { Doc, DocSection, DocUnit } from "../doc";
 import { passageBox } from "../hover";
@@ -12,7 +12,7 @@ import { FALLBACK_LANGS } from "../langs";
 import type { Level } from "../links";
 import type TextFoldBridgePlugin from "../main";
 import { Note, NotesFile, citationLinks, isModelPassage, noteLink, notePassage, passageLabel } from "../notes";
-import { FOLD_LEVELS, LEVEL_LABEL, Piece, PreparedUnit, alignRendered, piecesOf, piecesText, prepSection, prepUnit, tokenize } from "./align";
+import { Atom, FOLD_LEVELS, LEVEL_LABEL, Piece, PreparedUnit, alignRendered, piecesOf, piecesText, prepSection, prepUnit, tokenize } from "./align";
 import { FoldMap, NoteBlock, mapUnits, mappedShare, splitBlocks } from "./blocks";
 import { Motion } from "./motion";
 
@@ -61,6 +61,9 @@ export class FoldView extends FileView {
 	private hoverParent: HoverParent = { hoverPopover: null };
 	private hoverAt = new WeakMap<HTMLElement, number>();
 	private heatFrame = 0;
+	private cites = new Map<string, DocumentFragment>(); // a citation as the note's reading view shows it, drawn once per text
+	private citing = new Set<string>();
+	private mathSoon = debounce(() => void finishRenderMath(), 150, true);
 	private onEdit = debounce(() => {
 		if (this.file && !this.folding) void this.reload(this.file, false);
 	}, 1500, true);
@@ -176,6 +179,8 @@ export class FoldView extends FileView {
 		this.md?.unload();
 		this.md = null;
 		this.rendered.clear();
+		this.cites.clear();
+		this.citing.clear();
 		this.docEl?.empty();
 	}
 
@@ -201,8 +206,12 @@ export class FoldView extends FileView {
 		const rendered = new Map<number, HTMLElement>();
 		for (const b of blocks) {
 			if (b.type === "heading") continue;
+			// rendered in an element of the reading view's class, so that a plugin formatting citations there (Pandoc
+			// Reference List) formats them here too; its contents then go into the block's own element
+			const box = createDiv("markdown-preview-view");
+			await MarkdownRenderer.render(this.app, b.markdown, box, file.path, md);
 			const el = createDiv("tfb-md markdown-rendered");
-			await MarkdownRenderer.render(this.app, b.markdown, el, file.path, md);
+			el.append(...Array.from(box.childNodes));
 			rendered.set(b.index, el);
 		}
 		if (run !== this.run) {
@@ -592,7 +601,7 @@ export class FoldView extends FileView {
 				const { txt } = this.row("tfb-stk", `${s.id}:tk`);
 				txt.addClass("tfb-ai");
 				txt.dataset.evSec = s.id;
-				piecesInto(txt, sp.tk);
+				piecesInto(txt, sp.tk, this.atom);
 			}
 			for (const u of s.units) this.unitRow(u, level);
 		}
@@ -612,7 +621,7 @@ export class FoldView extends FileView {
 		if (n(level) >= 3 && !unf) txt.addClass("tfb-ai");
 		const fill = () => {
 			txt.empty();
-			piecesInto(txt, pcs);
+			piecesInto(txt, pcs, this.atom);
 			this.mark(txt, u.id, level, pcs);
 		};
 		txt.setText(piecesText(pcs));
@@ -637,7 +646,7 @@ export class FoldView extends FileView {
 			if (s.num) head.append(piece({ id: `${s.id}:n`, t: s.num }), " ");
 			head.appendChild(piece({ id: `${s.id}:h`, t: s.title.replace(/\$/g, "") || "Opening" }, "tfb-hd"));
 			const sp = this.secs.get(s.id);
-			if (sp?.tp.length) piecesInto(card.createDiv("tfb-cp"), sp.tp);
+			if (sp?.tp.length) piecesInto(card.createDiv("tfb-cp"), sp.tp, this.atom);
 			const chips = card.createDiv("tfb-cps");
 			for (const u of s.units) {
 				const p = this.units.get(u.id);
@@ -646,7 +655,7 @@ export class FoldView extends FileView {
 				chip.dataset.anchor = u.id;
 				chip.dataset.chip = u.id;
 				setTooltip(chip, u.takeaway || u.topic, { placement: "top" });
-				piecesInto(chip, piecesOf(p, "topic"));
+				piecesInto(chip, piecesOf(p, "topic"), this.atom);
 			}
 		}
 	}
@@ -714,6 +723,43 @@ export class FoldView extends FileView {
 		}
 	}
 
+	/** A formula or a citation in a row of pieces, as Obsidian draws it: the formula with MathJax, the citation as the note's
+	 *  reading view shows it (formatted by Pandoc Reference List when that is installed, else as written); a citation is
+	 *  rendered once per text and copied after, the rows already drawn getting it when it is ready. */
+	private atom = (p: Piece, span: HTMLElement): void => {
+		if (p.k === "math") {
+			const display = p.t.startsWith("$$");
+			span.append(renderMath(p.t.slice(display ? 2 : 1, display ? -2 : -1), display));
+			this.mathSoon();
+			return;
+		}
+		span.dataset.cite = p.t;
+		const done = this.cites.get(p.t);
+		if (done) span.append(done.cloneNode(true));
+		else {
+			span.setText(p.t);
+			this.renderCite(p.t);
+		}
+	};
+
+	private renderCite(raw: string): void {
+		const file = this.file;
+		if (!file || this.citing.has(raw)) return;
+		this.citing.add(raw);
+		const box = createDiv("markdown-preview-view"); // (the class Pandoc Reference List formats citations in)
+		void MarkdownRenderer.render(this.app, raw, box, file.path, this.md ?? this).then(() => {
+			if (this.file !== file) return;
+			const frag = createFragment();
+			for (const x of Array.from((box.querySelector("p") ?? box).childNodes)) frag.append(x.cloneNode(true));
+			this.cites.set(raw, frag);
+			for (const x of Array.from(this.docEl.querySelectorAll<HTMLElement>(".tfb-cite"))) {
+				if (x.dataset.cite !== raw) continue;
+				x.empty();
+				x.append(frag.cloneNode(true));
+			}
+		});
+	}
+
 	/** Wrap a rendered block's words into pieces with the ids of its paragraphs' words (Full ↔ Brief travel). */
 	private wrap(el: HTMLElement, unitIds: string[]): void {
 		if (el.dataset.wrapped) {
@@ -721,15 +767,15 @@ export class FoldView extends FileView {
 			return;
 		}
 		el.dataset.wrapped = "1";
-		const tokens: { id: string; t: string; c0: number; c1: number; hl: boolean; lead: boolean }[] = [];
+		const tokens: { id: string; t: string; c0: number; c1: number; hl: boolean; lead: boolean; k?: Atom }[] = [];
 		for (const id of unitIds) {
 			const p = this.units.get(id);
 			if (!p) continue;
 			const ev = new Set(p.ev);
 			const sentOf = (i: number) => p.sr.findIndex(([a, b]) => i >= a && i < b);
-			p.toks.forEach((t, i) => tokens.push({ id: `${id}:${i}`, t: t.t, c0: t.c0, c1: t.c1, hl: p.hl.has(i), lead: ev.has(sentOf(i)) }));
+			p.toks.forEach((t, i) => tokens.push({ id: `${id}:${i}`, t: t.t, c0: t.c0, c1: t.c1, hl: p.hl.has(i), lead: ev.has(sentOf(i)), k: t.k }));
 		}
-		const SKIP = ".internal-embed, .math, pre, .callout-icon, .copy-code-button, .list-bullet, .collapse-indicator, .heading-collapse-indicator, .frontmatter, img, svg";
+		const SKIP = ".internal-embed, .math, .pandoc-citation, pre, .callout-icon, .copy-code-button, .list-bullet, .collapse-indicator, .heading-collapse-indicator, .frontmatter, img, svg";
 		const walker = el.doc.createTreeWalker(el, NodeFilter.SHOW_TEXT);
 		const words: { node: Text; c0: number; c1: number; t: string }[] = [];
 		for (let node = walker.nextNode() as Text | null; node; node = walker.nextNode() as Text | null) {
@@ -755,6 +801,16 @@ export class FoldView extends FileView {
 			}
 			if (at < text.length) frag.appendText(text.slice(at));
 			node.replaceWith(frag);
+		}
+		// a formula and a formatted citation as rendered (MathJax, Pandoc Reference List): one piece each, the formulas
+		// and citations of its paragraphs taken in order, so they travel between Full and the other levels too
+		const done = new Set(Array.from(el.querySelectorAll<HTMLElement>(".tfb-tk[data-id]"), x => x.dataset.id));
+		for (const [k, sel] of [["math", "span.math"], ["cite", ".pandoc-citation"]] as const) {
+			const left = tokens.filter(t => t.k === k && !done.has(t.id));
+			Array.from(el.querySelectorAll<HTMLElement>(sel)).slice(0, left.length).forEach((x, i) => {
+				x.addClass("tfb-tk", "tfb-atom");
+				x.dataset.id = left[i].id;
+			});
 		}
 	}
 
@@ -913,20 +969,22 @@ export class FoldView extends FileView {
 	}
 }
 
-/** One word piece (an id it keeps across levels). */
-function piece(p: Piece, cls = ""): HTMLElement {
-	const span = createSpan({ cls: `tfb-tk${cls ? ` ${cls}` : ""}${p.lead ? " tfb-lead" : ""}${p.hl ? " tfb-hl" : ""}${p.gap ? " tfb-gap" : ""}`, text: p.gap ? "…" : p.t });
+/** One word piece (an id it keeps across levels); a formula or a citation drawn by `atom`. */
+function piece(p: Piece, cls = "", atom?: (p: Piece, span: HTMLElement) => void): HTMLElement {
+	const drawn = !!(p.k && atom);
+	const span = createSpan({ cls: `tfb-tk${cls ? ` ${cls}` : ""}${p.k ? ` tfb-${p.k}` : ""}${p.lead ? " tfb-lead" : ""}${p.hl ? " tfb-hl" : ""}${p.gap ? " tfb-gap" : ""}`, text: drawn ? undefined : p.gap ? "…" : p.t });
 	span.dataset.id = p.id;
+	if (drawn) atom?.(p, span);
 	return span;
 }
 
 /** Pieces into an element, words that touch kept on one line (TextFold's piecesHTML, as DOM). */
-function piecesInto(el: HTMLElement, pcs: Piece[]): void {
+function piecesInto(el: HTMLElement, pcs: Piece[], atom?: (p: Piece, span: HTMLElement) => void): void {
 	let group: HTMLElement | null = null;
 	pcs.forEach((x, i) => {
 		const last = i === pcs.length - 1, nx = pcs[i + 1];
 		const space = !last && (x.gap || x.s || nx.gap);
-		const span = piece(x);
+		const span = piece(x, "", atom);
 		if (!last && !space) {
 			group ??= el.createSpan("tfb-wg");
 			group.append(span);

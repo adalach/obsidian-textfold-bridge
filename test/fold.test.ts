@@ -20,6 +20,16 @@ describe("tokens and alignment", () => {
 		expect(tokenize("It's 3.5% faster, isn't it?").map(t => [t.t, t.s ?? 0])).toEqual([["It's", 1], ["3.5%", 1], ["faster", 0], [",", 1], ["isn't", 1], ["it", 0], ["?", 0]]);
 	});
 
+	it("keeps a formula and a citation in brackets whole, money and an address as words", () => {
+		const at = (text: string) => tokenize(text).map(t => (t.k ? `${t.k}:${t.t}` : t.t));
+		expect(at("use and CO$_2$ emissions")).toEqual(["use", "and", "CO", "math:$_2$", "emissions"]);
+		expect(at("a $x + y$ and $$E=mc^2$$ end")).toEqual(["a", "math:$x + y$", "and", "math:$$E=mc^2$$", "end"]);
+		expect(at("measures [@unep2025; @li2025, p. 3]. However")).toEqual(["measures", "cite:[@unep2025; @li2025, p. 3]", ".", "However"]);
+		expect(at("costs $5 and $10")).toEqual(["costs", "$", "5", "and", "$", "10"]);
+		expect(at("[me@x.org]")).toEqual(["[", "me", "@", "x", ".", "org", "]"]);
+		expect(tokenize("CO$_2$ emissions")[1].s).toBe(1);
+	});
+
 	it("matches words without stop words and plural s", () => {
 		expect([norm("The"), norm("Zones"), norm("glass"), norm("models")]).toEqual(["", "zone", "glass", "model"]);
 		expect(lcsPairs(["a", "b", "", "c"], ["b", "x", "c"])).toEqual([[1, 0], [3, 2]]);
@@ -75,6 +85,17 @@ describe("pieces per level", () => {
 
 	it("opens one paragraph at Full on its own", () => {
 		expect(piecesOf(p, "takeaway", true).length).toBe(piecesOf(p, "full").length);
+	});
+
+	it("carries a formula and a citation to every level they are in, as one piece", () => {
+		const q = prepUnit({ ...unit, id: "p-9", full: "Buildings emit CO$_2$ [@unep2025]. They age.", sentences: ["Buildings emit CO$_2$ [@unep2025].", "They age."],
+			evidence: [0], brief: ["Buildings emit CO$_2$ [@unep2025]."], key: "Buildings emit CO$_2$.", takeaway: "Buildings emit CO$_2$", topic: "CO$_2$" });
+		const kinds = (lv: "full" | "brief" | "key" | "takeaway" | "topic") => piecesOf(q, lv).filter(x => x.k).map(x => `${x.k}:${x.t}`);
+		expect(kinds("full")).toEqual(["math:$_2$", "cite:[@unep2025]"]);
+		expect(kinds("brief")).toEqual(["math:$_2$", "cite:[@unep2025]"]);
+		expect(kinds("key")).toEqual(["math:$_2$"]);
+		expect(kinds("topic")).toEqual(["math:$_2$"]);
+		expect(piecesOf(q, "key").find(x => x.k === "math")?.id).toBe(piecesOf(q, "full").find(x => x.k === "math")?.id);   // (it travels)
 	});
 
 	it("gives a section its summary and topic pieces", () => {
